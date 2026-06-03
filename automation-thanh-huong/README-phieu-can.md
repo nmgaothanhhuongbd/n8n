@@ -176,3 +176,54 @@ Tự động lấy các dòng **mua lúa** trong `PHIEU_CAN`, tra đơn giá, r�
 - **Cảnh báo công nợ tới hạn**: thêm workflow đọc `SO_CONG_NO`, lọc `Hạn thanh toán`
   gần đến → gửi Zalo/Telegram/email cho kế toán.
 - **In Phiếu nhập kho F08**: tạo Apps Script/looker lấy theo `Số phiếu NK` từ `SO_NHAP_KHO`.
+
+---
+
+# Workflow #3 — Bán cám/trấu/gạo → XUẤT KHO + Công nợ phải THU
+
+File: `phieu-can-to-ketoan-xuat.json`
+
+Là **gương của workflow #2** cho chiều bán ra. Tự lấy các dòng **bán cám/trấu/gạo**
+trong `PHIEU_CAN`, tra đơn giá bán, ghi sang **`SO_XUAT_KHO`** (dữ liệu cho Phiếu
+xuất kho F09) và **`SO_CONG_NO`** (công nợ **phải THU** khách hàng), rồi đánh dấu
+*đã ghi sổ* để không ghi trùng.
+
+## Luồng
+
+```
+[Theo lịch 10 phút]
+   → Đọc BANG_GIA → Đọc PHIEU_CAN
+   → Code: bỏ dòng đã ghi sổ; chỉ giữ phiếu BÁN HÀNG (loại = cám/trấu/gạo/tấm);
+            tra đơn giá bán → tính thành tiền; sinh "Số phiếu XK"; hạn thu +30 ngày
+   → ghi song song:
+        ├─ SO_XUAT_KHO   (1 dòng/phiếu xuất)
+        ├─ SO_CONG_NO    (1 dòng công nợ phải THU khách hàng)
+        └─ PHIEU_CAN     (đánh dấu "Đã ghi sổ KT = CÓ")
+```
+
+## Cần chuẩn bị thêm (ngoài các tab đã tạo ở workflow #2)
+
+**Tab `SO_XUAT_KHO`** (header hàng 1):
+`Ngày xuất` · `Số phiếu XK` · `Loại xuất` · `Khách hàng` · `Số chứng từ gốc` ·
+`Người giao / cân` · `Tên hàng` · `ĐVT` · `SL thực xuất` · `Đơn giá (đồng)` ·
+`Thành tiền (đồng)` · `Mục đích` · `Cần kiểm tra` · `Ghi chú` · `Link phiếu cân`
+
+> `BANG_GIA` dùng **chung**: chỉ cần thêm các dòng giá BÁN cho `cám gạo`, `trấu`,
+> `gạo`, `tấm`… (tên khác với lúa nên không lẫn với giá mua).
+>
+> `SO_CONG_NO` dùng **chung** với workflow #2. Cột `Loại công nợ` sẽ phân biệt:
+> *"Phải trả NCC (mua lúa)"* vs *"Phải thu KH (bán hàng)"*. Cột `Số phiếu NK`
+> trong sổ công nợ chứa **NK** (mua) hoặc **XK** (bán) tuỳ dòng.
+
+## Phối hợp với workflow #2 (chạy song song an toàn)
+
+- Một dòng phiếu cân **hoặc** là lúa (→ #2 xử lý) **hoặc** là cám/trấu/gạo (→ #3 xử lý),
+  không bao giờ cả hai → **không tranh chấp**, không ghi trùng.
+- Cả hai cùng dựa cột `Đã ghi sổ KT` để bỏ qua dòng đã xử lý.
+- Cài đặt y như #2: import file, gắn credential Google, thay 2 ID Sheet, Execute thử rồi Active.
+
+## Quy ước nghiệp vụ
+- **Chỉ xử lý BÁN** cám/trấu/gạo/tấm. Phiếu mua lúa bị bỏ qua (đã có #2 lo).
+- **Công nợ phải THU**: bán hàng → khách nợ công ty. `Còn nợ = Thành tiền`,
+  `Đã thu = 0`, trạng thái `Chưa thu`. Khi thu tiền, kế toán cập nhật cột "Đã trả/thu".
+- Hạn thu mặc định = ngày phiếu + 30 ngày (đổi `DUE_DAYS` trong node Code).
