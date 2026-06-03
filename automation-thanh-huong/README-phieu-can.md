@@ -227,3 +227,48 @@ xuất kho F09) và **`SO_CONG_NO`** (công nợ **phải THU** khách hàng), r
 - **Công nợ phải THU**: bán hàng → khách nợ công ty. `Còn nợ = Thành tiền`,
   `Đã thu = 0`, trạng thái `Chưa thu`. Khi thu tiền, kế toán cập nhật cột "Đã trả/thu".
 - Hạn thu mặc định = ngày phiếu + 30 ngày (đổi `DUE_DAYS` trong node Code).
+
+---
+
+# Dashboard tổng hợp + In phiếu F08/F09 (Google Apps Script)
+
+File: `KeToan_ThanhHuong.gs`
+
+Script Apps Script gắn vào **file Google Sheet KẾ TOÁN** (chứa `SO_NHAP_KHO`,
+`SO_XUAT_KHO`, `SO_CONG_NO`). Tạo menu **"⚙️ Kế toán Thạnh Hương"** với 3 chức năng:
+
+| Menu | Tác dụng |
+|------|----------|
+| 🔄 Cập nhật Dashboard | Tổng hợp tồn kho lúa, doanh thu phụ phẩm, công nợ 2 chiều theo tháng |
+| 🖨️ In Phiếu NHẬP kho (F08) | Nhập số phiếu NK → xuất **PDF** để in |
+| 🖨️ In Phiếu XUẤT kho (F09) | Nhập số phiếu XK → xuất **PDF** để in |
+
+## Cài đặt (1 lần)
+1. Mở file Google Sheet KẾ TOÁN → menu **Extensions ▸ Apps Script**.
+2. Xoá code mẫu, **dán toàn bộ** nội dung `KeToan_ThanhHuong.gs` ▸ **Save** (💾).
+3. Tải lại trang Sheet → xuất hiện menu **"⚙️ Kế toán Thạnh Hương"**.
+4. Lần đầu chạy mỗi chức năng sẽ hỏi **cấp quyền** (Authorize) → cho phép.
+
+## DASHBOARD
+- Chạy **🔄 Cập nhật Dashboard** → script tạo/làm mới tab `DASHBOARD`.
+- **Chọn kỳ báo cáo**: sửa các ô vàng rồi chạy lại menu:
+  - `B2` = Tháng (số) · `B3` = Năm (số)
+  - `B4` = **Lúa đưa vào sản xuất lũy kế (kg)** — nhập tay (vì chưa có sổ sản xuất)
+- Chỉ số hiển thị:
+  - **📦 Tồn kho lúa**: nhập trong tháng, lũy kế, *Tồn ước tính = lũy kế nhập − lúa đưa vào SX*.
+  - **💰 Doanh thu bán phụ phẩm**: tổng doanh thu + sản lượng tháng, chi tiết theo loại (cám/trấu/gạo…).
+  - **🧾 Công nợ 2 chiều**: phải trả & phải thu còn lại, phần **quá hạn** (theo `Hạn thanh toán`),
+    phát sinh trong tháng, và chênh lệch Thu − Trả.
+
+> "Tồn kho lúa" hiện = tổng nhập − ô "lúa đưa vào SX" (nhập tay), vì chưa có sổ tiêu
+> hao sản xuất. Khi nào có workflow ghi lượng lúa vào xay sẽ tự động hoá được nốt.
+
+## In phiếu F08/F09 ra PDF
+- Chạy menu in → nhập **Số phiếu NK/XK** đúng như trong sổ.
+- Script gom các dòng cùng số phiếu, dựng phiếu in ở tab `IN_PHIEU`, xuất **PDF** vào
+  thư mục Drive **`PHIEU_IN`**, rồi hiện **link mở/tải PDF** (mở được trên điện thoại).
+- In lại cùng số phiếu sẽ **ghi đè** PDF cũ (không tạo trùng).
+
+## Tự động cập nhật Dashboard hàng ngày (tuỳ chọn)
+Apps Script ▸ **Triggers (⏰) ▸ Add Trigger** → hàm `capNhatDashboard`,
+*Time-driven ▸ Day timer* (vd 6–7h sáng).
