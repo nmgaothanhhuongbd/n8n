@@ -1,0 +1,296 @@
+{
+  "name": "Phiếu cân → Nhập kho + Công nợ phải trả (Thạnh Hương)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "b1111111-1111-4111-8111-111111111111",
+      "name": "Theo lịch (10 phút)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_KETOAN_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "BANG_GIA",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "b2222222-2222-4222-8222-222222222222",
+      "name": "Đọc bảng giá",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -100,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_PHIEUCAN_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "b3333333-3333-4333-8333-333333333333",
+      "name": "Đọc PHIEU_CAN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        120,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ====== Lọc phiếu NHẬP KHO (mua lúa) & dựng dòng cho sổ kế toán ======\n// Chạy 1 lần cho tất cả item (runOnceForAllItems)\n\n// 1) Bảng giá: chuẩn hoá để tra theo loại lúa\nconst priceRows = $('Đọc bảng giá').all().map(i => i.json);\nconst norm = (s) => String(s || '')\n  .toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/đ/g, 'd').replace(/\\s+/g, ' ').trim();\nconst priceList = priceRows\n  .map(r => ({ key: norm(r['Loại hàng / lúa']), gia: Number(String(r['Đơn giá (đ/kg)'] || '').replace(/[^0-9.\\-]/g, '')) }))\n  .filter(p => p.key);\n\nconst lookupPrice = (loai) => {\n  const k = norm(loai);\n  if (!k) return null;\n  let hit = priceList.find(p => p.key === k);\n  if (!hit) hit = priceList.find(p => k.includes(p.key) || p.key.includes(k));\n  return (hit && !isNaN(hit.gia) && hit.gia > 0) ? hit.gia : null;\n};\n\nconst toNum = (s) => {\n  if (s === null || s === undefined || s === '') return null;\n  const n = Number(String(s).replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? null : n;\n};\n\n// DD/MM/YYYY -> Date\nconst parseVNDate = (s) => {\n  const m = String(s || '').match(/(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})/);\n  if (!m) return null;\n  let [_, d, mo, y] = m; if (y.length === 2) y = '20' + y;\n  const dt = new Date(Number(y), Number(mo) - 1, Number(d));\n  return isNaN(dt.getTime()) ? null : dt;\n};\nconst fmtDate = (dt) => dt ? `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}` : '';\n\nconst DUE_DAYS = 30; // hạn thanh toán mặc định (ngày) - đổi nếu cần\n\nconst out = [];\nlet seq = 0;\nfor (const it of $input.all()) {\n  const row = it.json;\n\n  // Bỏ qua dòng đã ghi sổ\n  if (String(row['Đã ghi sổ KT'] || '').toUpperCase().includes('C')) continue;\n\n  // Xác định CHIỀU giao dịch theo loại hàng (từ góc nhìn nhà máy Thạnh Hương)\n  const loaiHang = row['Loại hàng / lúa'] || '';\n  const nl = norm(loaiHang);\n  const isByproduct = /(cam|trau|gao|tam)/.test(nl);            // cám/trấu/gạo/tấm = bán ra\n  const isPaddy = /(lua|thoc|paddy|nep|om\\d|dai thom|st\\d|ir\\d|khang dan)/.test(nl);\n  const kieu = norm(row['Kiểu cân']);\n  // Chỉ xử lý MUA LÚA nhập kho\n  const isPaddyPurchase = (isPaddy && !isByproduct) || (!isByproduct && !isPaddy && kieu.includes('nhap'));\n  if (!isPaddyPurchase) continue;\n\n  seq += 1;\n  const sl = toNum(row['TL hàng (kg)']);\n  const gia = lookupPrice(loaiHang);\n  const thanhTien = (sl !== null && gia !== null) ? Math.round(sl * gia) : '';\n\n  // Số phiếu nhập kho\n  const ngayPhieu = row['Ngày phiếu'] || '';\n  const dt = parseVNDate(ngayPhieu);\n  const compact = dt ? `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}` : new Date().toISOString().slice(0,10).replace(/-/g,'');\n  const soPhieuCan = row['Số phiếu'] || '';\n  const soPhieuNK = soPhieuCan ? `NK-${String(soPhieuCan).replace(/[^0-9A-Za-z]/g,'')}` : `NK-${compact}-${String(seq).padStart(3,'0')}`;\n\n  // Hạn thanh toán\n  const han = dt ? fmtDate(new Date(dt.getTime() + DUE_DAYS*86400000)) : '';\n\n  // Ghi chú & cờ\n  const reasons = [];\n  const canKiemTra = String(row['Cần kiểm tra'] || '');\n  if (canKiemTra.toUpperCase().includes('C')) reasons.push('Phiếu cân cần kiểm tra: ' + (row['Lý do kiểm tra'] || ''));\n  if (gia === null) reasons.push('Cần nhập đơn giá (chưa có trong BANG_GIA)');\n  const ghiChu = reasons.join('; ');\n\n  const nhaCC = row['Người bán / Khách hàng'] || '';\n  const linkAnh = row['Link ảnh'] || '';\n\n  out.push({ json: {\n    ngay_nhap: ngayPhieu,\n    so_phieu_nk: soPhieuNK,\n    loai_nhap: 'Mua lúa nhập kho',\n    nha_cung_cap: nhaCC,\n    so_chung_tu_goc: soPhieuCan,\n    nguoi_giao: row['Người cân'] || '',\n    ten_hang: loaiHang || 'Lúa',\n    dvt: 'kg',\n    sl_thuc_nhap: sl !== null ? sl : '',\n    don_gia: gia !== null ? gia : '',\n    thanh_tien: thanhTien,\n    kcs_chat_luong: row['Ghi chú chất lượng'] || '',\n    can_kiem_tra: canKiemTra || 'Không',\n    ghi_chu: ghiChu,\n    link_anh: linkAnh,\n    // ----- công nợ phải trả -----\n    cn_loai: 'Phải trả NCC (mua lúa)',\n    cn_dien_giai: `Mua ${loaiHang || 'lúa'}${sl!==null?(' '+sl+' kg'):''}${soPhieuCan?(' theo phiếu '+soPhieuCan):''}`,\n    cn_gia_tri: thanhTien,\n    cn_da_tra: thanhTien === '' ? '' : 0,\n    cn_con_no: thanhTien,\n    cn_han: han,\n    cn_trang_thai: thanhTien === '' ? 'Chờ đơn giá' : 'Chưa trả'\n  }});\n}\n\nreturn out;"
+      },
+      "id": "b4444444-4444-4444-8444-444444444444",
+      "name": "Lọc & dựng dòng nhập kho",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_KETOAN_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SO_NHAP_KHO",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ngày nhập": "={{ $json.ngay_nhap }}",
+            "Số phiếu NK": "={{ $json.so_phieu_nk }}",
+            "Loại nhập": "={{ $json.loai_nhap }}",
+            "Nhà cung cấp": "={{ $json.nha_cung_cap }}",
+            "Số chứng từ gốc": "={{ $json.so_chung_tu_goc }}",
+            "Người giao hàng": "={{ $json.nguoi_giao }}",
+            "Tên hàng / lúa": "={{ $json.ten_hang }}",
+            "ĐVT": "={{ $json.dvt }}",
+            "SL thực nhập": "={{ $json.sl_thuc_nhap }}",
+            "Đơn giá (đồng)": "={{ $json.don_gia }}",
+            "Thành tiền (đồng)": "={{ $json.thanh_tien }}",
+            "KCS / Chất lượng": "={{ $json.kcs_chat_luong }}",
+            "Cần kiểm tra": "={{ $json.can_kiem_tra }}",
+            "Ghi chú": "={{ $json.ghi_chu }}",
+            "Link phiếu cân": "={{ $json.link_anh }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "b5555555-5555-4555-8555-555555555555",
+      "name": "Ghi SO_NHAP_KHO",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        120
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_KETOAN_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SO_CONG_NO",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ngày": "={{ $json.ngay_nhap }}",
+            "Loại công nợ": "={{ $json.cn_loai }}",
+            "Số phiếu NK": "={{ $json.so_phieu_nk }}",
+            "Nhà cung cấp / KH": "={{ $json.nha_cung_cap }}",
+            "Diễn giải": "={{ $json.cn_dien_giai }}",
+            "Giá trị (đồng)": "={{ $json.cn_gia_tri }}",
+            "Đã trả/thu (đồng)": "={{ $json.cn_da_tra }}",
+            "Còn nợ (đồng)": "={{ $json.cn_con_no }}",
+            "Hạn thanh toán": "={{ $json.cn_han }}",
+            "Trạng thái": "={{ $json.cn_trang_thai }}",
+            "Link phiếu cân": "={{ $json.link_anh }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "b6666666-6666-4666-8666-666666666666",
+      "name": "Ghi SO_CONG_NO (phải trả)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_PHIEUCAN_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Link ảnh": "={{ $json.link_anh }}",
+            "Đơn giá (đ/kg)": "={{ $json.don_gia }}",
+            "Thành tiền (đồng)": "={{ $json.thanh_tien }}",
+            "Số phiếu NK": "={{ $json.so_phieu_nk }}",
+            "Đã ghi sổ KT": "CÓ"
+          },
+          "matchingColumns": [
+            "Link ảnh"
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7777777-7777-4777-8777-777777777777",
+      "name": "Cập nhật PHIEU_CAN (đã ghi sổ)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        480
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Theo lịch (10 phút)": {
+      "main": [
+        [
+          {
+            "node": "Đọc bảng giá",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đọc bảng giá": {
+      "main": [
+        [
+          {
+            "node": "Đọc PHIEU_CAN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đọc PHIEU_CAN": {
+      "main": [
+        [
+          {
+            "node": "Lọc & dựng dòng nhập kho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lọc & dựng dòng nhập kho": {
+      "main": [
+        [
+          {
+            "node": "Ghi SO_NHAP_KHO",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ghi SO_CONG_NO (phải trả)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Cập nhật PHIEU_CAN (đã ghi sổ)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

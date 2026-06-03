@@ -99,3 +99,80 @@ Tạo 1 sheet (tab) tên **`PHIEU_CAN`** với hàng tiêu đề (hàng 1) gồm
   thông báo khi `Cần kiểm tra = CÓ`.
 - **Tách 2 loại phiếu** (thu mua lúa vào / bán cám–trấu ra): có thể thêm node IF dựa
   trên cột "Kiểu cân" để ghi sang 2 sheet khác nhau.
+
+---
+
+# Workflow #2 — Nối phiếu cân sang SỔ KẾ TOÁN (Nhập kho + Công nợ phải trả)
+
+File: `phieu-can-to-ketoan.json`
+
+Tự động lấy các dòng **mua lúa** trong `PHIEU_CAN`, tra đơn giá, rồi ghi sang
+**`SO_NHAP_KHO`** (dữ liệu cho Phiếu nhập kho F08) và **`SO_CONG_NO`** (công nợ
+**phải trả** nhà cung cấp), đồng thời đánh dấu lại dòng phiếu cân là *đã ghi sổ*
+để **không bị ghi trùng**.
+
+> ⚠️ **Nguyên tắc thiết kế:** KHÔNG ghi thẳng vào biểu mẫu in F08/F09 (có ô gộp,
+> số dòng cố định, công thức TỔNG, ô chữ ký → sẽ vỡ layout). Thay vào đó ghi vào
+> các **sổ dữ liệu cộng dồn** (`SO_NHAP_KHO`, `SO_CONG_NO`); khi cần in phiếu F08
+> thì lọc/lấy dữ liệu từ sổ này.
+
+## Luồng
+
+```
+[Theo lịch 10 phút]
+   → Đọc BANG_GIA (bảng giá theo loại lúa)
+   → Đọc PHIEU_CAN
+   → Code: bỏ dòng đã ghi sổ; chỉ giữ phiếu MUA LÚA (loại hàng = lúa/thóc...,
+            không phải cám/trấu/gạo); tra đơn giá → tính thành tiền;
+            sinh "Số phiếu NK"; tính hạn thanh toán (mặc định +30 ngày)
+   → ghi song song:
+        ├─ SO_NHAP_KHO   (1 dòng/phiếu nhập)
+        ├─ SO_CONG_NO    (1 dòng công nợ phải trả NCC)
+        └─ PHIEU_CAN     (đánh dấu "Đã ghi sổ KT = CÓ" + đơn giá/thành tiền/số NK)
+```
+
+## Cần chuẩn bị (tạo thêm các tab)
+
+**1) Thêm 4 cột vào tab `PHIEU_CAN`** (sau các cột cũ):
+`Đơn giá (đ/kg)` · `Thành tiền (đồng)` · `Số phiếu NK` · `Đã ghi sổ KT`
+
+**2) Tab `BANG_GIA`** (bạn cập nhật giá khi thị trường đổi):
+`Loại hàng / lúa` · `Đơn giá (đ/kg)` · `Đơn vị` · `Cập nhật ngày` · `Ghi chú`
+> Tra giá theo *gần đúng* tên loại lúa (không phân biệt hoa thường/dấu). Loại nào
+> chưa có giá → để trống thành tiền và gắn cờ **"Cần nhập đơn giá"** trong Ghi chú.
+
+**3) Tab `SO_NHAP_KHO`** (header hàng 1):
+`Ngày nhập` · `Số phiếu NK` · `Loại nhập` · `Nhà cung cấp` · `Số chứng từ gốc` ·
+`Người giao hàng` · `Tên hàng / lúa` · `ĐVT` · `SL thực nhập` · `Đơn giá (đồng)` ·
+`Thành tiền (đồng)` · `KCS / Chất lượng` · `Cần kiểm tra` · `Ghi chú` · `Link phiếu cân`
+
+**4) Tab `SO_CONG_NO`** (công nợ phải trả – header hàng 1):
+`Ngày` · `Loại công nợ` · `Số phiếu NK` · `Nhà cung cấp / KH` · `Diễn giải` ·
+`Giá trị (đồng)` · `Đã trả/thu (đồng)` · `Còn nợ (đồng)` · `Hạn thanh toán` ·
+`Trạng thái` · `Link phiếu cân`
+
+## Cài đặt
+1. Import `phieu-can-to-ketoan.json` vào n8n.
+2. Gắn credential Google (dùng lại của workflow #1).
+3. Thay placeholder:
+   - `REPLACE_PHIEUCAN_SHEET_ID` → ID Google Sheet chứa `PHIEU_CAN`
+   - `REPLACE_KETOAN_SHEET_ID` → ID file kế toán chứa `BANG_GIA`, `SO_NHAP_KHO`, `SO_CONG_NO`
+     (có thể là **cùng 1 file** với PHIEU_CAN — khi đó điền cùng ID).
+4. Execute thử → kiểm tra dữ liệu sang 2 sổ và cột "Đã ghi sổ KT" = CÓ.
+5. Bật **Active** để chạy tự động mỗi 10 phút.
+
+## Quy ước nghiệp vụ đã cài
+- **Chỉ xử lý MUA LÚA** (loại hàng là lúa/thóc/OM.../ST...). Phiếu bán cám/trấu/gạo
+  sẽ bị **bỏ qua** (ngoài phạm vi nhập kho).
+- **Công nợ phải TRẢ**: mua lúa → công ty nợ NCC. `Còn nợ = Thành tiền`, `Đã trả = 0`,
+  trạng thái `Chưa trả`. Khi chi tiền, kế toán cập nhật cột "Đã trả".
+- **Chuyển tất cả phiếu**, kể cả phiếu *Cần kiểm tra* — nhưng cột `Cần kiểm tra`
+  và ghi chú được mang sang sổ để kế toán biết dòng nào cần soát lại.
+- **Chống ghi trùng**: dựa vào cột `Đã ghi sổ KT` trong PHIEU_CAN (đối chiếu theo
+  `Link ảnh`). Dòng đã = CÓ sẽ không xử lý lại.
+- **Hạn thanh toán** mặc định = ngày phiếu + 30 ngày (đổi biến `DUE_DAYS` trong node Code).
+
+## Tuỳ chỉnh thường gặp
+- **Cảnh báo công nợ tới hạn**: thêm workflow đọc `SO_CONG_NO`, lọc `Hạn thanh toán`
+  gần đến → gửi Zalo/Telegram/email cho kế toán.
+- **In Phiếu nhập kho F08**: tạo Apps Script/looker lấy theo `Số phiếu NK` từ `SO_NHAP_KHO`.
