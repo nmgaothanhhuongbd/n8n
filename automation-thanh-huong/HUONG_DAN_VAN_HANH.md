@@ -80,10 +80,22 @@ Giá trị (đồng) | Đã trả/thu (đồng) | Còn nợ (đồng) | Hạn th
       Nếu dùng Service Account: **chia sẻ** thư mục ảnh + file Sheet cho email service account.
 - [ ] **Header Auth** cho Anthropic: Name = `x-api-key`, Value = API key Claude.
 
-### Bước 5. Import & cấu hình Workflow #1 (đọc ảnh)
+### Bước 5. Import & cấu hình Workflow #1 (đọc ảnh) — chọn 1 trong 2 bản
+
+**Bản A — Claude (trả phí, chính xác nhất với chữ viết tay):** file `phieu-can-ocr-thanh-huong.json`
 1. n8n → **Import from File** → `phieu-can-ocr-thanh-huong.json`.
-2. Gắn credential **Google** cho 3 node Drive/Sheets; credential **Header Auth** cho node Claude.
+2. Gắn credential **Google** cho 3 node Drive/Sheets; credential **Header Auth** (`x-api-key`) cho node Claude.
 3. Node "Ghi vào Google Sheet": thay `REPLACE_SHEET_ID` = `KETOAN_SHEET_ID`, tab = `PHIEU_CAN`.
+
+**Bản B — Google Cloud Vision (MIỄN PHÍ 1.000 ảnh/tháng):** file `phieu-can-ocr-google-vision.json`
+1. Bật **Cloud Vision API** trong Google Cloud → tạo **API key**.
+2. Import `phieu-can-ocr-google-vision.json`; gắn credential **Google** cho node Drive/Sheets.
+3. Tạo credential **Query Auth** cho node "Google Vision OCR": Name = `key`, Value = API key Vision.
+4. Node "Ghi vào Google Sheet": thay `REPLACE_SHEET_ID`, tab = `PHIEU_CAN`.
+
+> ⚠️ Chỉ bật **một** trong hai bản theo dõi thư mục ảnh (tránh ghi đôi).
+
+**Chung cho cả 2 bản:**
 4. **Execute Workflow** → upload thử 1 ảnh phiếu vào thư mục → kiểm tra có dòng mới trong `PHIEU_CAN`.
 5. Bật **Active**.
 

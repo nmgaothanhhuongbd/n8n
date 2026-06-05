@@ -1,0 +1,260 @@
+{
+  "name": "Phiếu cân - OCR Google Cloud Vision (MIỄN PHÍ) → Google Sheet",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1r7ltl3SUJz-JxkUox5Ohd_KH7AAyFWIpocGx5xSJPEombOmF5JfmQTv5H5ypXyMcgSAPabgA",
+          "mode": "id"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "d1111111-1111-4111-8111-111111111111",
+      "name": "Drive: ảnh phiếu mới",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "d0000001",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "image/",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d2222222-2222-4222-8222-222222222222",
+      "name": "Chỉ xử lý ảnh",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "d3333333-3333-4333-8333-333333333333",
+      "name": "Tải ảnh phiếu",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        140,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Chuyển ảnh sang base64 + dựng body gọi Google Cloud Vision (DOCUMENT_TEXT_DETECTION)\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64 = buffer.toString('base64');\nconst trigger = $('Drive: ảnh phiếu mới').item.json;\nreturn {\n  json: {\n    fileId: trigger.id,\n    fileName: trigger.name,\n    body: {\n      requests: [{\n        image: { content: base64 },\n        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],\n        imageContext: { languageHints: ['vi'] }\n      }]\n    }\n  }\n};"
+      },
+      "id": "d4444444-4444-4444-8444-444444444444",
+      "name": "Chuẩn bị ảnh (base64)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://vision.googleapis.com/v1/images:annotate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d5555555-5555-4555-8555-555555555555",
+      "name": "Google Vision OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        580,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GVISION_CRED",
+          "name": "Google Vision API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ====== Đọc OCR Google Vision + TÁCH TRƯỜNG bằng quy tắc ======\nconst prep = $('Chuẩn bị ảnh (base64)').item.json;\nconst fileId = prep.fileId, fileName = prep.fileName;\n\nlet text = '';\ntry { text = $json.responses[0].fullTextAnnotation.text || ''; } catch (e) { text = ''; }\n\nconst lines = text.split('\\n').map(s => s.trim()).filter(Boolean);\nconst T = text.replace(/\\s+/g, ' ');\nconst pad = (s) => ('0' + String(s)).slice(-2);\n\n// --- số cân: \"9,790 kg\" (phẩy = ngăn nghìn), \"3,210.00 kg\" ---\nconst parseWeight = (s) => {\n  if (s == null) return null;\n  let x = String(s).replace(/\\s/g, '').replace(/,/g, '');\n  const n = parseFloat(x.replace(/[^0-9.]/g, ''));\n  return isNaN(n) ? null : Math.round(n);\n};\nconst findKg = (label) => {\n  const re = new RegExp(label + \"\\\\s*[:\\\\-]?\\\\s*([0-9][0-9.,]*)\\\\s*kg\", 'i');\n  const m = T.match(re);\n  return m ? parseWeight(m[1]) : null;\n};\n\nlet tl_hang = findKg('Trọng lượng hàng') || findKg('Trọng lượng tịnh') || findKg('Net weight');\nlet tl_xe_vao = findKg('Trọng lượng xe vào') || findKg('xe có hàng') || findKg('Truck weight with goods');\nlet tl_xe_ra = findKg('Trọng lượng xe ra') || findKg('Truck weight');\nif (tl_hang == null && tl_xe_vao != null && tl_xe_ra != null) tl_hang = Math.abs(tl_xe_vao - tl_xe_ra);\n\n// --- ngày ---\nlet ngay = '';\nconst dm = T.match(/(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{2,4})/);\nif (dm) { let y = dm[3].length === 2 ? '20' + dm[3] : dm[3]; ngay = pad(dm[1]) + '/' + pad(dm[2]) + '/' + y; }\n\n// --- số phiếu ---\nlet so_phieu = (T.match(/VT[-\\s]?\\d+\\s*\\/\\s*\\d+/i) || [''])[0];\nif (!so_phieu) { const m = T.match(/Số phiếu[^A-Z0-9]*([A-Z0-9][A-Z0-9\\-\\/.]{2,})/i); so_phieu = m ? m[1] : ''; }\nso_phieu = so_phieu.replace(/\\s+/g, '');\n\n// --- số xe (biển VN: 77C22118, 77C-14025) ---\nlet so_xe = (T.match(/\\b\\d{2}\\s?[A-Z]{1,2}[-\\s]?\\d{3,5}\\b/) || [''])[0].replace(/[-\\s]/g, '');\n\n// --- người bán / khách hàng ---\nconst skip = /(DE HEUS|THẠNH HƯƠNG|THANH HUONG|VIỆT\\s*-\\s*PHÁP|VIET\\s*-\\s*PHAP|FEEDMILL|CHI NHÁNH|MST)/i;\nlet nguoi_ban = '';\nfor (const l of lines) {\n  if (/(CÔNG TY|CONG TY|CTY|CP |DNTN|HỘ KINH|HKD)/i.test(l) && !skip.test(l) && l.length > 8) { nguoi_ban = l; break; }\n}\n\n// --- loại hàng / lúa ---\nlet loai = (T.match(/(CÁM GẠO|CAM GAO|TRẤU|TRAU|THÓC|THOC|LÚA|LUA|TẤM|TAM|GẠO|GAO|OM\\s?\\d+|ĐT\\s?\\d+|ST\\s?\\d+|IR\\s?\\d+)/i) || [''])[0].trim();\n\n// --- kiểu cân ---\nlet kieu = /XUẤT|XUAT/i.test(T) ? 'XUẤT' : (/(NHẬP|NHAP|Intake)/i.test(T) ? 'NHẬP' : '');\n\n// --- người cân ---\nlet nguoi_can = '';\nfor (let i = 0; i < lines.length; i++) {\n  if (/Người cân/i.test(lines[i])) {\n    const rest = lines[i].replace(/.*Người cân[:\\s]*/i, '').trim();\n    nguoi_can = rest || (lines[i + 1] || '');\n    break;\n  }\n}\nnguoi_can = nguoi_can.replace(/[0-9]/g, '').trim();\n\n// --- độ ẩm ---\nlet do_am = '';\nconst am = T.match(/(?:ẩm|am)[^0-9]{0,8}([0-9]{1,2}([.,][0-9])?)\\s*%/i) || T.match(/([0-9]{1,2}([.,][0-9])?)\\s*%/);\nif (am) do_am = am[1];\n\n// --- kiểm tra logic số cân ---\nlet mathOk = true, mathNote = '';\nif (tl_xe_vao != null && tl_xe_ra != null && tl_hang != null) {\n  const diff = Math.abs(Math.abs(tl_xe_vao - tl_xe_ra) - tl_hang);\n  if (diff > Math.max(20, tl_hang * 0.01)) { mathOk = false; mathNote = `Lệch cân: |${tl_xe_vao}-${tl_xe_ra}| khác ${tl_hang}`; }\n}\n\nconst missing = [];\nif (tl_hang == null) missing.push('số cân');\nif (!nguoi_ban) missing.push('người bán');\nif (!loai) missing.push('loại hàng');\nif (!text) missing.push('OCR trống');\n\nconst conf = (missing.length === 0 && mathOk) ? 'cao' : (missing.length <= 1 ? 'trung bình' : 'thấp');\nconst needsReview = missing.length > 0 || !mathOk;\n\nconst reasons = [];\nif (missing.length) reasons.push('Thiếu/khó đọc: ' + missing.join(', '));\nif (!mathOk) reasons.push(mathNote);\nreasons.push('Đối chiếu ảnh để xác nhận');\n\nreturn {\n  json: {\n    'Thời gian xử lý': new Date().toISOString(),\n    'Tên file': fileName || '',\n    'Link ảnh': fileId ? `https://drive.google.com/file/d/${fileId}/view` : '',\n    'Ngày phiếu': ngay,\n    'Số phiếu': so_phieu,\n    'Người bán / Khách hàng': nguoi_ban,\n    'Loại hàng / lúa': loai,\n    'Số xe': so_xe,\n    'TL xe vào (kg)': tl_xe_vao != null ? tl_xe_vao : '',\n    'TL xe ra (kg)': tl_xe_ra != null ? tl_xe_ra : '',\n    'TL hàng (kg)': tl_hang != null ? tl_hang : '',\n    'Độ ẩm (%)': do_am,\n    'Kiểu cân': kieu,\n    'Ghi chú chất lượng': '',\n    'Người cân': nguoi_can,\n    'Độ tin cậy': conf,\n    'Cần kiểm tra': needsReview ? 'CÓ' : 'Không',\n    'Lý do kiểm tra': reasons.join('; ')\n  }\n};"
+      },
+      "id": "d6666666-6666-4666-8666-666666666666",
+      "name": "Tách trường (regex)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "d7777777-7777-4777-8777-777777777777",
+      "name": "Ghi vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1020,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Drive: ảnh phiếu mới": {
+      "main": [
+        [
+          {
+            "node": "Chỉ xử lý ảnh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chỉ xử lý ảnh": {
+      "main": [
+        [
+          {
+            "node": "Tải ảnh phiếu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh phiếu": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị ảnh (base64)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị ảnh (base64)": {
+      "main": [
+        [
+          {
+            "node": "Google Vision OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Vision OCR": {
+      "main": [
+        [
+          {
+            "node": "Tách trường (regex)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách trường (regex)": {
+      "main": [
+        [
+          {
+            "node": "Ghi vào Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

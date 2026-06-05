@@ -7,6 +7,9 @@ khớp logic) sẽ được **đánh dấu "Cần kiểm tra = CÓ"** để ngư
 
 File workflow: `phieu-can-ocr-thanh-huong.json`
 
+> 💡 **Bản MIỄN PHÍ:** có thêm `phieu-can-ocr-google-vision.json` dùng **Google Cloud
+> Vision** (1.000 ảnh/tháng miễn phí) thay cho Claude — xem mục cuối README.
+
 ---
 
 ## 1. Luồng hoạt động
@@ -272,3 +275,41 @@ Script Apps Script gắn vào **file Google Sheet KẾ TOÁN** (chứa `SO_NHAP_
 ## Tự động cập nhật Dashboard hàng ngày (tuỳ chọn)
 Apps Script ▸ **Triggers (⏰) ▸ Add Trigger** → hàm `capNhatDashboard`,
 *Time-driven ▸ Day timer* (vd 6–7h sáng).
+
+---
+
+# Phương án MIỄN PHÍ — Google Cloud Vision OCR (thay cho Claude)
+
+File: `phieu-can-ocr-google-vision.json`
+
+Đọc ảnh phiếu bằng **Google Cloud Vision** (gói **miễn phí 1.000 ảnh/tháng**), rồi
+**tách trường bằng quy tắc (regex)** ngay trong n8n — không cần AI trả phí.
+Kết quả ghi vào cùng tab `PHIEU_CAN`, nên **#2/#3 và Apps Script dùng lại y nguyên**.
+
+## Khác gì bản Claude?
+| | Bản Claude | Bản Google Vision (miễn phí) |
+|---|---|---|
+| Chi phí | Trả phí (rất nhỏ) | **Miễn phí** tới 1.000 ảnh/tháng |
+| Chữ in / số cân | Rất tốt | **Rất tốt** |
+| Chữ viết tay | Tốt | Trung bình (đã gắn cờ để soát) |
+| Tách trường | AI tự hiểu, linh hoạt | Theo **quy tắc** — khớp tốt với phiếu De Heus/nhà máy, phiếu lạ có thể cần soát |
+
+## Lấy API key (miễn phí)
+1. Vào https://console.cloud.google.com → tạo Project.
+2. Bật **Cloud Vision API** (APIs & Services ▸ Enable).
+3. Tạo **API key** (Credentials ▸ Create credentials ▸ API key).
+   - Vision có **1.000 đơn vị/tháng miễn phí**; cần bật Billing nhưng không bị tính phí nếu trong hạn mức.
+
+## Cài đặt
+1. Import `phieu-can-ocr-google-vision.json`.
+2. Gắn credential **Google** (Drive/Sheets) cho 3 node Drive/Sheets.
+3. Tạo credential **Query Auth** cho node "Google Vision OCR":
+   - **Name:** `key` · **Value:** API key Vision vừa tạo.
+4. Node "Ghi vào Google Sheet": thay `REPLACE_SHEET_ID` = ID file, tab `PHIEU_CAN`.
+5. Execute thử với 1 ảnh → kiểm tra dòng trong `PHIEU_CAN` → bật **Active**.
+
+> ⚠️ Dùng **một trong hai** bản (Claude **hoặc** Vision), không bật cả hai cùng theo dõi
+> một thư mục để tránh ghi đôi. Mọi thứ phía sau (#2, #3, Dashboard) giữ nguyên.
+>
+> 💡 Muốn tách trường chính xác hơn mà vẫn miễn phí: có thể ghép **Vision OCR + Gemini
+> free** để Gemini hiểu text → JSON. Báo mình nếu cần bản này.
