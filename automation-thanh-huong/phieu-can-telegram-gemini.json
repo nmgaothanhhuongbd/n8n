@@ -1,0 +1,275 @@
+{
+  "name": "Telegram → Gemini đọc phiếu → Google Sheet (Thạnh Hương)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "e1111111-1111-4111-8111-111111111111",
+      "name": "Telegram: nhận phiếu",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -360,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.photo ? $json.message.photo[$json.message.photo.length - 1].file_id : ($json.message.document ? $json.message.document.file_id : '') }}"
+      },
+      "id": "e2222222-2222-4222-8222-222222222222",
+      "name": "Tải ảnh từ Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -140,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Chuyển ảnh Telegram sang base64 + dựng body gọi Gemini\\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\\nconst base64 = buffer.toString('base64');\\nconst bin = $input.item.binary && $input.item.binary.data ? $input.item.binary.data : {};\\nconst mimeType = bin.mimeType || 'image/jpeg';\\nconst tg = $('Telegram: nhận phiếu').item.json;\\nconst msg = tg.message || {};\\nconst fileName = bin.fileName || ('telegram_' + (msg.message_id || Date.now()) + '.jpg');\\nconst prompt = \"Bạn là trợ lý kế toán đọc PHIẾU CÂN của nhà máy xay xát gạo Thạnh Hương. Ảnh có thể là phiếu IN hoặc phiếu VIẾT TAY (ghi tay, tính toán tay). Hãy đọc thật kỹ, kể cả chữ viết tay và các phép tính, rồi trích xuất thông tin.\\\\n\\\\nCHỈ TRẢ VỀ 1 object JSON đúng cấu trúc sau (không thêm giải thích):\\\\n{\\\\n  \\\\\\\"ngay\\\\\\\": \\\\\\\"ngày trên phiếu, dạng DD/MM/YYYY nếu đọc được\\\\\\\",\\\\n  \\\\\\\"so_phieu\\\\\\\": \\\\\\\"số phiếu/chứng từ nếu có\\\\\\\",\\\\n  \\\\\\\"nguoi_ban_khach_hang\\\\\\\": \\\\\\\"tên người bán/khách hàng/nhà cung cấp nếu có\\\\\\\",\\\\n  \\\\\\\"loai_hang_lua\\\\\\\": \\\\\\\"loại hàng hoặc loại lúa (vd: lúa tươi, OM5451, cám gạo, trấu, tấm...)\\\\\\\",\\\\n  \\\\\\\"so_xe\\\\\\\": \\\\\\\"biển số xe nếu có\\\\\\\",\\\\n  \\\\\\\"tl_xe_vao\\\\\\\": \\\\\\\"trọng lượng xe vào/xe có hàng, CHỈ số kg\\\\\\\",\\\\n  \\\\\\\"tl_xe_ra\\\\\\\": \\\\\\\"trọng lượng xe ra/xe không, CHỈ số kg\\\\\\\",\\\\n  \\\\\\\"tl_hang\\\\\\\": \\\\\\\"trọng lượng hàng (tịnh), CHỈ số kg\\\\\\\",\\\\n  \\\\\\\"do_am\\\\\\\": \\\\\\\"độ ẩm % nếu có\\\\\\\",\\\\n  \\\\\\\"kieu_can\\\\\\\": \\\\\\\"NHẬP hay XUẤT nếu xác định được\\\\\\\",\\\\n  \\\\\\\"ghi_chu_chat_luong\\\\\\\": \\\\\\\"ghi chú chất lượng/tạp chất/đơn giá/thành tiền nếu có\\\\\\\",\\\\n  \\\\\\\"nguoi_can\\\\\\\": \\\\\\\"tên người cân/người ghi nếu có\\\\\\\",\\\\n  \\\\\\\"do_tin_cay\\\\\\\": \\\\\\\"cao | trung bình | thấp — mức chắc chắn khi đọc, hạ thấp nếu chữ tay khó\\\\\\\",\\\\n  \\\\\\\"can_kiem_tra\\\\\\\": true hoặc false — true nếu có trường quan trọng (số cân/người bán/loại lúa) không chắc,\\\\n  \\\\\\\"ly_do_kiem_tra\\\\\\\": \\\\\\\"vì sao cần kiểm tra, rỗng nếu không\\\\\\\"\\\\n}\\\\nTrường nào không có thì để chuỗi rỗng. Số cân chỉ ghi con số, không kèm 'kg', không dấu phẩy ngăn nghìn.\";\\nreturn {\\n  json: {\\n    fileName,\\n    chatId: (msg.chat && msg.chat.id) || '',\\n    messageId: msg.message_id || '',\\n    body: {\\n      contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } } ] }],\\n      generationConfig: { temperature: 0, response_mime_type: 'application/json' }\\n    }\\n  },\\n  binary: $input.item.binary\\n};"
+      },
+      "id": "e3333333-3333-4333-8333-333333333333",
+      "name": "Chuẩn bị ảnh (Gemini)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Chuẩn bị ảnh (Gemini)').item.json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1nmhHHs3F3BF7KRqv_1PHIwvXEIFIm60t",
+          "mode": "id"
+        },
+        "options": {},
+        "binaryData": true,
+        "binaryPropertyName": "data"
+      },
+      "id": "e4444444-4444-4444-8444-444444444444",
+      "name": "Lưu ảnh vào Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        300,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Chuẩn bị ảnh (Gemini)').item.json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "e5555555-5555-4555-8555-555555555555",
+      "name": "Gemini đọc phiếu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GEMINI_CRED",
+          "name": "Gemini API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Phân tích kết quả Gemini + kiểm tra logic số cân\\nconst prep = $('Chuẩn bị ảnh (Gemini)').item.json;\\nconst fileName = prep.fileName;\\nlet driveId = '';\\ntry { driveId = $('Lưu ảnh vào Drive').item.json.id; } catch (e) { driveId = ''; }\\nconst linkAnh = driveId ? ('https://drive.google.com/file/d/' + driveId + '/view') : ('telegram-msg-' + (prep.messageId || ''));\\n\\nlet text = '';\\ntry { text = $json.candidates[0].content.parts[0].text; } catch (e) { text = ''; }\\nlet clean = (text || '').trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();\\nlet data = {}; let parseError = '';\\ntry { data = JSON.parse(clean); } catch (e) { parseError = 'Không đọc được JSON từ AI'; data = {}; }\\n\\nconst toNum = (s) => { if (s === null || s === undefined || s === '') return null; const n = Number(String(s).replace(/[^0-9.\\\\-]/g, '')); return isNaN(n) ? null : n; };\\nconst vao = toNum(data.tl_xe_vao), ra = toNum(data.tl_xe_ra); let hang = toNum(data.tl_hang);\\nif (hang === null && vao !== null && ra !== null) hang = Math.abs(vao - ra);\\n\\nlet mathOk = true, mathNote = '';\\nif (vao !== null && ra !== null && hang !== null) {\\n  const diff = Math.abs(Math.abs(vao - ra) - hang);\\n  if (diff > Math.max(20, hang * 0.01)) { mathOk = false; mathNote = 'Lệch cân: |'+vao+'-'+ra+'| khác '+hang; }\\n}\\n\\nconst conf = String(data.do_tin_cay || '').toLowerCase();\\nconst lowConf = conf.includes('thấp') || conf.includes('thap') || conf === 'low';\\nconst aiFlag = data.can_kiem_tra === true || data.can_kiem_tra === 'true';\\nconst needsReview = !!(parseError || lowConf || !mathOk || aiFlag);\\n\\nconst reasons = [];\\nif (parseError) reasons.push(parseError);\\nif (lowConf) reasons.push('AI báo độ tin cậy thấp');\\nif (!mathOk) reasons.push(mathNote);\\nif (aiFlag && data.ly_do_kiem_tra) reasons.push(data.ly_do_kiem_tra);\\nelse if (aiFlag) reasons.push('AI đánh dấu cần kiểm tra');\\n\\nreturn { json: {\\n  'Thời gian xử lý': new Date().toISOString(),\\n  'Tên file': fileName || '',\\n  'Link ảnh': linkAnh,\\n  'Ngày phiếu': data.ngay || '',\\n  'Số phiếu': data.so_phieu || '',\\n  'Người bán / Khách hàng': data.nguoi_ban_khach_hang || '',\\n  'Loại hàng / lúa': data.loai_hang_lua || '',\\n  'Số xe': data.so_xe || '',\\n  'TL xe vào (kg)': vao !== null ? vao : '',\\n  'TL xe ra (kg)': ra !== null ? ra : '',\\n  'TL hàng (kg)': hang !== null ? hang : '',\\n  'Độ ẩm (%)': data.do_am || '',\\n  'Kiểu cân': data.kieu_can || '',\\n  'Ghi chú chất lượng': data.ghi_chu_chat_luong || '',\\n  'Người cân': data.nguoi_can || '',\\n  'Độ tin cậy': data.do_tin_cay || '',\\n  'Cần kiểm tra': needsReview ? 'CÓ' : 'Không',\\n  'Lý do kiểm tra': reasons.join('; ')\\n} };"
+      },
+      "id": "e6666666-6666-4666-8666-666666666666",
+      "name": "Tách trường",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hg_fTt3wnlOyCkW-u1OqBRQDR9lmMclt_oChHtPPh1s",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "e7777777-7777-4777-8777-777777777777",
+      "name": "Ghi vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chuẩn bị ảnh (Gemini)').item.json.chatId }}",
+        "text": "=✅ Đã ghi phiếu vào sổ.\\n• Loại hàng: {{ $('Tách trường').item.json['Loại hàng / lúa'] || '(chưa rõ)' }}\\n• TL hàng: {{ $('Tách trường').item.json['TL hàng (kg)'] || '?' }} kg\\n• Số xe: {{ $('Tách trường').item.json['Số xe'] || '-' }}\\n• Cần kiểm tra: {{ $('Tách trường').item.json['Cần kiểm tra'] }}{{ $('Tách trường').item.json['Lý do kiểm tra'] ? ('\\n⚠️ ' + $('Tách trường').item.json['Lý do kiểm tra']) : '' }}",
+        "additionalFields": {}
+      },
+      "id": "e8888888-8888-4888-8888-888888888888",
+      "name": "Trả lời Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1180,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram: nhận phiếu": {
+      "main": [
+        [
+          {
+            "node": "Tải ảnh từ Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh từ Telegram": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị ảnh (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị ảnh (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Lưu ảnh vào Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lưu ảnh vào Drive": {
+      "main": [
+        [
+          {
+            "node": "Gemini đọc phiếu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini đọc phiếu": {
+      "main": [
+        [
+          {
+            "node": "Tách trường",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách trường": {
+      "main": [
+        [
+          {
+            "node": "Ghi vào Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi vào Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Trả lời Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
