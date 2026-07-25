@@ -1,0 +1,201 @@
+{
+  "name": "Telegram TEXT → Gemini → Google Sheet (Thạnh Hương)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "f1111111-1111-4111-8111-111111111111",
+      "name": "Telegram: nhận phiếu",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Dựng body gọi Gemini từ TEXT nhân viên gửi qua Telegram\\nconst tg = $('Telegram: nhận phiếu').item.json;\\nconst msg = tg.message || {};\\nconst noiDung = (msg.text || msg.caption || '').trim();\\nconst prompt = \"Bạn là trợ lý kế toán nhà máy xay xát gạo Thạnh Hương. Nhân viên GÕ TEXT mô tả một chứng từ/phiếu (mua lúa, bán cám/trấu/gạo, công nợ...) bằng tiếng Việt tự nhiên, có thể viết tắt. Hãy hiểu và tách thành các trường.\\\\n\\\\nCHỈ TRẢ VỀ 1 object JSON đúng cấu trúc (không giải thích):\\\\n{\\\\n  \\\\\\\"ngay\\\\\\\": \\\\\\\"ngày, dạng DD/MM/YYYY; nếu không ghi thì để rỗng\\\\\\\",\\\\n  \\\\\\\"so_phieu\\\\\\\": \\\\\\\"số phiếu/chứng từ nếu có\\\\\\\",\\\\n  \\\\\\\"nguoi_ban_khach_hang\\\\\\\": \\\\\\\"tên người bán/khách hàng/nhà cung cấp\\\\\\\",\\\\n  \\\\\\\"loai_hang_lua\\\\\\\": \\\\\\\"loại hàng/lúa (lúa tươi, OM5451, cám gạo, trấu, tấm...)\\\\\\\",\\\\n  \\\\\\\"so_xe\\\\\\\": \\\\\\\"biển số xe nếu có\\\\\\\",\\\\n  \\\\\\\"tl_xe_vao\\\\\\\": \\\\\\\"kg xe vào nếu có, CHỈ số\\\\\\\",\\\\n  \\\\\\\"tl_xe_ra\\\\\\\": \\\\\\\"kg xe ra nếu có, CHỈ số\\\\\\\",\\\\n  \\\\\\\"tl_hang\\\\\\\": \\\\\\\"kg hàng (khối lượng chính), CHỈ số\\\\\\\",\\\\n  \\\\\\\"do_am\\\\\\\": \\\\\\\"độ ẩm % nếu có\\\\\\\",\\\\n  \\\\\\\"kieu_can\\\\\\\": \\\\\\\"NHẬP hay XUẤT\\\\\\\",\\\\n  \\\\\\\"ghi_chu_chat_luong\\\\\\\": \\\\\\\"đơn giá, thành tiền, chất lượng, ghi chú khác nếu có\\\\\\\",\\\\n  \\\\\\\"nguoi_can\\\\\\\": \\\\\\\"tên người ghi/nộp nếu có\\\\\\\",\\\\n  \\\\\\\"do_tin_cay\\\\\\\": \\\\\\\"cao | trung bình | thấp\\\\\\\",\\\\n  \\\\\\\"can_kiem_tra\\\\\\\": true hoặc false (true nếu thiếu/không chắc trường quan trọng),\\\\n  \\\\\\\"ly_do_kiem_tra\\\\\\\": \\\\\\\"lý do, rỗng nếu không\\\\\\\"\\\\n}\\\\nTrường không có để rỗng. Số kg chỉ ghi con số, bỏ 'kg' và dấu phẩy ngăn nghìn.\" + '\\\\n\\\\nNỘI DUNG NHÂN VIÊN GỬI:\\\\n\\\"\\\"\\\"' + noiDung + '\\\"\\\"\\\"';\\nreturn { json: {\\n  chatId: (msg.chat && msg.chat.id) || '',\\n  messageId: msg.message_id || '',\\n  noiDung,\\n  body: { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, response_mime_type: 'application/json' } }\\n} };"
+      },
+      "id": "f2222222-2222-4222-8222-222222222222",
+      "name": "Chuẩn bị yêu cầu (Gemini)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -90,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "f3333333-3333-4333-8333-333333333333",
+      "name": "Gemini đọc text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        140,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GEMINI_CRED",
+          "name": "Gemini API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Phân tích JSON Gemini + kiểm tra logic số cân\\nconst prep = $('Chuẩn bị yêu cầu (Gemini)').item.json;\\nconst linkAnh = 'telegram-msg-' + (prep.messageId || '');\\nlet text = '';\\ntry { text = $json.candidates[0].content.parts[0].text; } catch (e) { text = ''; }\\nlet clean = (text || '').trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();\\nlet data = {}; let parseError = '';\\ntry { data = JSON.parse(clean); } catch (e) { parseError = 'Không đọc được JSON từ AI'; data = {}; }\\n\\nconst toNum = (s) => { if (s === null || s === undefined || s === '') return null; const n = Number(String(s).replace(/[^0-9.\\\\-]/g, '')); return isNaN(n) ? null : n; };\\nconst vao = toNum(data.tl_xe_vao), ra = toNum(data.tl_xe_ra); let hang = toNum(data.tl_hang);\\nif (hang === null && vao !== null && ra !== null) hang = Math.abs(vao - ra);\\n\\nlet mathOk = true, mathNote = '';\\nif (vao !== null && ra !== null && hang !== null) {\\n  const diff = Math.abs(Math.abs(vao - ra) - hang);\\n  if (diff > Math.max(20, hang * 0.01)) { mathOk = false; mathNote = 'Lệch cân: |'+vao+'-'+ra+'| khác '+hang; }\\n}\\n\\nconst conf = String(data.do_tin_cay || '').toLowerCase();\\nconst lowConf = conf.includes('thấp') || conf.includes('thap') || conf === 'low';\\nconst aiFlag = data.can_kiem_tra === true || data.can_kiem_tra === 'true';\\nconst needsReview = !!(parseError || lowConf || !mathOk || aiFlag);\\n\\nconst reasons = [];\\nif (parseError) reasons.push(parseError);\\nif (lowConf) reasons.push('AI báo độ tin cậy thấp');\\nif (!mathOk) reasons.push(mathNote);\\nif (aiFlag && data.ly_do_kiem_tra) reasons.push(data.ly_do_kiem_tra);\\nelse if (aiFlag) reasons.push('AI đánh dấu cần kiểm tra');\\n\\nreturn { json: {\\n  'Thời gian xử lý': new Date().toISOString(),\\n  'Tên file': 'Telegram text',\\n  'Link ảnh': linkAnh,\\n  'Ngày phiếu': data.ngay || '',\\n  'Số phiếu': data.so_phieu || '',\\n  'Người bán / Khách hàng': data.nguoi_ban_khach_hang || '',\\n  'Loại hàng / lúa': data.loai_hang_lua || '',\\n  'Số xe': data.so_xe || '',\\n  'TL xe vào (kg)': vao !== null ? vao : '',\\n  'TL xe ra (kg)': ra !== null ? ra : '',\\n  'TL hàng (kg)': hang !== null ? hang : '',\\n  'Độ ẩm (%)': data.do_am || '',\\n  'Kiểu cân': data.kieu_can || '',\\n  'Ghi chú chất lượng': data.ghi_chu_chat_luong || '',\\n  'Người cân': data.nguoi_can || '',\\n  'Độ tin cậy': data.do_tin_cay || '',\\n  'Cần kiểm tra': needsReview ? 'CÓ' : 'Không',\\n  'Lý do kiểm tra': reasons.join('; ')\\n} };"
+      },
+      "id": "f4444444-4444-4444-8444-444444444444",
+      "name": "Tách trường",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        370,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hg_fTt3wnlOyCkW-u1OqBRQDR9lmMclt_oChHtPPh1s",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "f5555555-5555-4555-8555-555555555555",
+      "name": "Ghi vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chuẩn bị yêu cầu (Gemini)').item.json.chatId }}",
+        "text": "=✅ Đã ghi chứng từ.\\n• Loại: {{ $('Tách trường').item.json['Loại hàng / lúa'] || '(chưa rõ)' }}\\n• Người bán/KH: {{ $('Tách trường').item.json['Người bán / Khách hàng'] || '-' }}\\n• TL hàng: {{ $('Tách trường').item.json['TL hàng (kg)'] || '?' }} kg\\n• Kiểu: {{ $('Tách trường').item.json['Kiểu cân'] || '-' }}\\n• Cần kiểm tra: {{ $('Tách trường').item.json['Cần kiểm tra'] }}{{ $('Tách trường').item.json['Lý do kiểm tra'] ? ('\\n⚠️ ' + $('Tách trường').item.json['Lý do kiểm tra']) : '' }}",
+        "additionalFields": {}
+      },
+      "id": "f6666666-6666-4666-8666-666666666666",
+      "name": "Trả lời Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        830,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram: nhận phiếu": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị yêu cầu (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị yêu cầu (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Gemini đọc text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini đọc text": {
+      "main": [
+        [
+          {
+            "node": "Tách trường",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách trường": {
+      "main": [
+        [
+          {
+            "node": "Ghi vào Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi vào Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Trả lời Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
