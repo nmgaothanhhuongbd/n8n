@@ -1,0 +1,260 @@
+{
+  "name": "CCCD: ảnh Drive → Gemini tách thông tin → Google Sheet",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1kT2HoU9EZVuSJTx4AIoSRn-u5Qsge6T9",
+          "mode": "id"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "g1111111-1111-4111-8111-111111111111",
+      "name": "Drive: ảnh CCCD mới",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "g0000001",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "image/",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "g2222222-2222-4222-8222-222222222222",
+      "name": "Chỉ xử lý ảnh",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "g3333333-3333-4333-8333-333333333333",
+      "name": "Tải ảnh CCCD",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        120,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Chuyển ảnh CCCD sang base64 + dựng body gọi Gemini\\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\\nconst base64 = buffer.toString('base64');\\nconst bin = $input.item.binary && $input.item.binary.data ? $input.item.binary.data : {};\\nconst mimeType = bin.mimeType || 'image/jpeg';\\nconst trigger = $('Drive: ảnh CCCD mới').item.json;\\nconst prompt = \"Bạn là trợ lý nhập liệu. Ảnh là CĂN CƯỚC CÔNG DÂN (CCCD) Việt Nam — có thể là mặt trước, mặt sau, hoặc cả hai. Đọc thật kỹ và trích xuất TẤT CẢ thông tin.\\\\n\\\\nCHỈ TRẢ VỀ 1 object JSON đúng cấu trúc (không giải thích):\\\\n{\\\\n  \\\\\\\"so_cccd\\\\\\\": \\\\\\\"số CCCD (12 chữ số) hoặc số CMND nếu là bản cũ\\\\\\\",\\\\n  \\\\\\\"ho_ten\\\\\\\": \\\\\\\"họ và tên đầy đủ, VIẾT HOA như trên thẻ\\\\\\\",\\\\n  \\\\\\\"ngay_sinh\\\\\\\": \\\\\\\"ngày sinh dạng DD/MM/YYYY\\\\\\\",\\\\n  \\\\\\\"gioi_tinh\\\\\\\": \\\\\\\"Nam hoặc Nữ\\\\\\\",\\\\n  \\\\\\\"quoc_tich\\\\\\\": \\\\\\\"quốc tịch\\\\\\\",\\\\n  \\\\\\\"que_quan\\\\\\\": \\\\\\\"quê quán đầy đủ\\\\\\\",\\\\n  \\\\\\\"noi_thuong_tru\\\\\\\": \\\\\\\"nơi thường trú / nơi cư trú đầy đủ\\\\\\\",\\\\n  \\\\\\\"co_gia_tri_den\\\\\\\": \\\\\\\"ngày hết hạn (Có giá trị đến), DD/MM/YYYY hoặc chữ nếu ghi khác\\\\\\\",\\\\n  \\\\\\\"ngay_cap\\\\\\\": \\\\\\\"ngày cấp (mặt sau), DD/MM/YYYY\\\\\\\",\\\\n  \\\\\\\"noi_cap\\\\\\\": \\\\\\\"nơi cấp (vd: Cục Cảnh sát QLHC về TTXH)\\\\\\\",\\\\n  \\\\\\\"dac_diem_nhan_dang\\\\\\\": \\\\\\\"đặc điểm nhận dạng nếu có (mặt sau)\\\\\\\",\\\\n  \\\\\\\"do_tin_cay\\\\\\\": \\\\\\\"cao | trung bình | thấp — mức chắc chắn khi đọc\\\\\\\",\\\\n  \\\\\\\"can_kiem_tra\\\\\\\": true hoặc false — true nếu có trường quan trọng (số CCCD, họ tên, ngày sinh) không chắc,\\\\n  \\\\\\\"ly_do_kiem_tra\\\\\\\": \\\\\\\"lý do, rỗng nếu không\\\\\\\"\\\\n}\\\\nTrường nào không thấy trên ảnh thì để chuỗi rỗng. Không bịa thông tin.\";\\nreturn { json: {\\n  fileId: trigger.id,\\n  fileName: trigger.name,\\n  body: {\\n    contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } } ] }],\\n    generationConfig: { temperature: 0, response_mime_type: 'application/json' }\\n  }\\n} };"
+      },
+      "id": "g4444444-4444-4444-8444-444444444444",
+      "name": "Chuẩn bị ảnh (Gemini)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "g5555555-5555-4555-8555-555555555555",
+      "name": "Gemini đọc CCCD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GEMINI_CRED",
+          "name": "Gemini API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Phân tích JSON Gemini → cột CCCD\\nconst prep = $('Chuẩn bị ảnh (Gemini)').item.json;\\nconst fileId = prep.fileId, fileName = prep.fileName;\\nlet text = '';\\ntry { text = $json.candidates[0].content.parts[0].text; } catch (e) { text = ''; }\\nlet clean = (text || '').trim().replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();\\nlet data = {}; let parseError = '';\\ntry { data = JSON.parse(clean); } catch (e) { parseError = 'Không đọc được JSON từ AI'; data = {}; }\\n\\nconst conf = String(data.do_tin_cay || '').toLowerCase();\\nconst lowConf = conf.includes('thấp') || conf.includes('thap') || conf === 'low';\\nconst aiFlag = data.can_kiem_tra === true || data.can_kiem_tra === 'true';\\nconst missing = [];\\nif (!data.so_cccd) missing.push('số CCCD');\\nif (!data.ho_ten) missing.push('họ tên');\\nif (!text) missing.push('OCR trống');\\nconst needsReview = !!(parseError || lowConf || aiFlag || missing.length);\\nconst reasons = [];\\nif (parseError) reasons.push(parseError);\\nif (missing.length) reasons.push('Thiếu/khó đọc: ' + missing.join(', '));\\nif (lowConf) reasons.push('AI báo độ tin cậy thấp');\\nif (aiFlag && data.ly_do_kiem_tra) reasons.push(data.ly_do_kiem_tra);\\n\\nreturn { json: {\\n  'Thời gian xử lý': new Date().toISOString(),\\n  'Tên file': fileName || '',\\n  'Link ảnh': fileId ? ('https://drive.google.com/file/d/' + fileId + '/view') : '',\\n  'Số CCCD': data.so_cccd || '',\\n  'Họ và tên': data.ho_ten || '',\\n  'Ngày sinh': data.ngay_sinh || '',\\n  'Giới tính': data.gioi_tinh || '',\\n  'Quốc tịch': data.quoc_tich || '',\\n  'Quê quán': data.que_quan || '',\\n  'Nơi thường trú': data.noi_thuong_tru || '',\\n  'Có giá trị đến': data.co_gia_tri_den || '',\\n  'Ngày cấp': data.ngay_cap || '',\\n  'Nơi cấp': data.noi_cap || '',\\n  'Đặc điểm nhận dạng': data.dac_diem_nhan_dang || '',\\n  'Độ tin cậy': data.do_tin_cay || '',\\n  'Cần kiểm tra': needsReview ? 'CÓ' : 'Không',\\n  'Lý do kiểm tra': reasons.join('; ')\\n} };"
+      },
+      "id": "g6666666-6666-4666-8666-666666666666",
+      "name": "Tách thông tin CCCD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1NVaYQypE11CB0r3aK7C1EE2pr4hR13YLvnLxxRS03x0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CCCD_DATA",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "g7777777-7777-4777-8777-777777777777",
+      "name": "Ghi vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Drive: ảnh CCCD mới": {
+      "main": [
+        [
+          {
+            "node": "Chỉ xử lý ảnh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chỉ xử lý ảnh": {
+      "main": [
+        [
+          {
+            "node": "Tải ảnh CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh CCCD": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị ảnh (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị ảnh (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Gemini đọc CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini đọc CCCD": {
+      "main": [
+        [
+          {
+            "node": "Tách thông tin CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách thông tin CCCD": {
+      "main": [
+        [
+          {
+            "node": "Ghi vào Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
