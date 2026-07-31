@@ -8,6 +8,7 @@ const GREEN='1E4D2B', GREEN2='2E7D46', MOSS='6FA86A', GOLD='E0A83B', GOLDD='B983
 const INK='1B2A20', GRAY='5E6B60', WHITE='FFFFFF', MIST='EFF4EE', MISTG='FBF3DD';
 const HF='Cambria', BF='Calibri';
 const W=13.33, H=7.5, M=0.7;
+const LOGO='/tmp/claude-0/-home-user-n8n/e6b51ae7-6c99-5683-8277-7db523f0061c/scratchpad/huongdan/logo.png';
 
 const shadow=()=>({type:'outer',color:'8AA090',blur:9,offset:3,angle:90,opacity:0.35});
 function card(s,x,y,w,h,fill,radius=0.14){ s.addShape(p.ShapeType.roundRect,{x,y,w,h,fill:{color:fill},line:{type:'none'},rectRadius:radius,shadow:shadow()}); }
@@ -20,13 +21,15 @@ function footer(s,n){ s.addText([{text:'Mini App Thạnh Hương',options:{color
 let s=p.addSlide(); s.background={color:GREEN};
 s.addShape(p.ShapeType.ellipse,{x:9.8,y:-2.2,w:6.2,h:6.2,fill:{color:GREEN2},line:{type:'none'}});
 s.addShape(p.ShapeType.ellipse,{x:11.4,y:4.2,w:4.6,h:4.6,fill:{color:'234E31'},line:{type:'none'}});
-s.addText('🌾',{x:0.7,y:0.7,w:1.4,h:1.2,fontSize:54,align:'left'});
+s.addImage({path:LOGO,x:0.7,y:0.5,w:1.6,h:1.6});
 s.addText('SỔ TAY HƯỚNG DẪN',{x:0.75,y:2.05,w:11,h:0.7,fontFace:BF,bold:true,fontSize:22,color:GOLD,charSpacing:3});
 s.addText('MINI APP THẠNH HƯƠNG',{x:0.7,y:2.6,w:12,h:1.5,fontFace:HF,bold:true,fontSize:52,color:WHITE});
 s.addText('Trợ lý Telegram giúp nhập liệu tự động: đọc căn cước, phiếu cân,\nghi sổ mua lúa — chỉ bằng cách chụp ảnh và bấm nút.',{x:0.75,y:4.15,w:9.5,h:1.0,fontFace:BF,fontSize:16,color:'D9E6DC',lineSpacingMultiple:1.15});
 s.addShape(p.ShapeType.roundRect,{x:0.75,y:5.5,w:5.2,h:0.75,fill:{color:GOLD},line:{type:'none'},rectRadius:0.1});
 s.addText('📘  Tài liệu hướng dẫn nhân viên',{x:0.75,y:5.5,w:5.2,h:0.75,align:'center',valign:'middle',fontFace:BF,bold:true,fontSize:14,color:INK});
-s.addText('Nhà máy Xay xát Gạo Thạnh Hương',{x:0.75,y:6.6,w:9,h:0.35,fontFace:BF,fontSize:12,color:'AFC3B4'});
+s.addText('CÔNG TY TNHH TM DV XNK THÀNH HƯNG',{x:0.75,y:6.3,w:11,h:0.35,fontFace:BF,bold:true,fontSize:13,color:GOLD,charSpacing:1});
+s.addText('Nhà máy Xay xát Gạo Thạnh Hương',{x:0.75,y:6.68,w:9,h:0.3,fontFace:BF,fontSize:11.5,color:'AFC3B4'});
+s.addText([{text:'Người thực hiện: ',options:{color:'AFC3B4'}},{text:'Phan Tấn Phương',options:{color:WHITE,bold:true}}],{x:0.75,y:6.98,w:9,h:0.3,fontFace:BF,fontSize:11.5});
 
 // ============ SLIDE 2 — MINI APP LÀ GÌ ============
 s=p.addSlide(); s.background={color:WHITE};
@@ -152,6 +155,7 @@ s.addText('🔒  QUY TẮC VÀNG',{x:M,y:0.7,w:11,h:0.6,fontFace:BF,bold:true,fo
 s.addText('Giữ an toàn cho dữ liệu',{x:M,y:1.25,w:11,h:0.9,fontFace:HF,bold:true,fontSize:36,color:WHITE});
 const rules=[['Không chia sẻ đường link bot cho người ngoài công ty.'],['Không dùng ảnh căn cước cho mục đích ngoài công việc.'],['Chỉ nhân viên được cấp quyền mới sử dụng bot.'],['Thấy sai sót thì báo quản lý, không tự ý sửa lung tung.']];
 rules.forEach((r,i)=>{ circle(s,M,2.45+i*0.85,0.55,GOLD,String(i+1),INK,18); s.addText(r[0],{x:M+0.8,y:2.45+i*0.85,w:9.5,h:0.6,valign:'middle',fontFace:BF,fontSize:16,color:'E8F1EA'}); });
+s.addText([{text:'Biên soạn & triển khai:  ',options:{color:'AFC3B4'}},{text:'Phan Tấn Phương',options:{color:GOLD,bold:true}}],{x:M,y:5.72,w:W-2*M,h:0.35,align:'right',fontFace:BF,fontSize:13});
 card(s,M,6.15,W-2*M,0.85,GOLD,0.12);
 s.addText('🌾  Chúc cả nhà làm việc thật nhẹ nhàng và hiệu quả!',{x:M,y:6.15,w:W-2*M,h:0.85,align:'center',valign:'middle',fontFace:HF,bold:true,fontSize:18,color:INK});
 
