@@ -1,0 +1,213 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Sổ tay Mini App Thạnh Hương</title>
+<style>
+@page{ size:A4; margin:14mm 14mm 16mm 14mm; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;color:#1B2A20;font-size:12pt;line-height:1.5;}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;}
+.green{color:#1E4D2B;} .gold{color:#B9832B;}
+/* Cover */
+.cover{background:#1E4D2B;color:#fff;height:267mm;border-radius:10px;padding:26mm 20mm;position:relative;overflow:hidden;page-break-after:always;}
+.cover .blob{position:absolute;border-radius:50%;background:#2E7D46;}
+.cover .b1{width:120mm;height:120mm;right:-40mm;top:-40mm;}
+.cover .b2{width:80mm;height:80mm;right:-20mm;bottom:-30mm;background:#234E31;}
+.cover .emoji{font-size:46pt;position:relative;}
+.cover .kick{color:#E0A83B;letter-spacing:4px;font-weight:bold;font-size:15pt;margin-top:34mm;position:relative;}
+.cover h1{font-size:40pt;line-height:1.1;margin-top:6mm;position:relative;}
+.cover .sub{color:#D9E6DC;font-size:13pt;margin-top:10mm;max-width:130mm;position:relative;line-height:1.6;}
+.cover .badge{display:inline-block;background:#E0A83B;color:#1B2A20;font-weight:bold;padding:5mm 9mm;border-radius:7px;margin-top:16mm;position:relative;font-size:12pt;}
+.cover .co{position:absolute;bottom:20mm;left:20mm;color:#AFC3B4;font-size:11pt;}
+/* Sections */
+.sec{page-break-inside:avoid;margin-bottom:9mm;}
+.secnew{page-break-before:always;}
+.kicker{color:#B9832B;font-weight:bold;letter-spacing:2px;font-size:9.5pt;text-transform:uppercase;}
+h2{font-size:20pt;color:#1E4D2B;margin:1mm 0 3mm;}
+.lead{color:#3f5145;font-size:11.5pt;margin-bottom:4mm;}
+/* Step cards */
+.step{display:flex;gap:5mm;background:#EFF4EE;border-radius:9px;padding:4mm 5mm;margin-bottom:3mm;page-break-inside:avoid;}
+.step .n{flex:0 0 9mm;height:9mm;border-radius:50%;background:#1E4D2B;color:#fff;font-weight:bold;font-family:Georgia,serif;display:flex;align-items:center;justify-content:center;font-size:12pt;}
+.step .n.g{background:#E0A83B;color:#1B2A20;}
+.step h3{font-size:12.5pt;color:#1E4D2B;margin-bottom:1mm;}
+.step p{font-size:11pt;color:#43554a;}
+/* Button grid */
+.grid{display:flex;flex-wrap:wrap;gap:4mm;}
+.bcard{flex:1 1 45%;background:#EFF4EE;border-radius:9px;padding:4mm 5mm;display:flex;gap:4mm;align-items:center;page-break-inside:avoid;}
+.bcard .ic{font-size:22pt;flex:0 0 auto;}
+.bcard h3{font-size:13pt;color:#1E4D2B;}
+.bcard p{font-size:10.5pt;color:#4a5a50;}
+/* code box */
+.code{background:#1E4D2B;color:#fff;border-radius:8px;padding:4mm 6mm;font-family:"Courier New",monospace;font-size:12.5pt;font-weight:bold;margin:3mm 0;}
+.code .k{color:#E0A83B;}
+.ex{background:#FBF3DD;border-radius:8px;padding:3.5mm 6mm;font-family:"Courier New",monospace;font-size:11.5pt;color:#1B2A20;margin:2mm 0;}
+/* two col */
+.two{display:flex;gap:5mm;}
+.col{flex:1;border-radius:9px;padding:4mm 5mm;page-break-inside:avoid;}
+.do{background:#EAF5EC;} .dont{background:#FBEDEA;}
+.col h3{font-size:13pt;margin-bottom:2mm;}
+.col ul{list-style:none;} .col li{font-size:10.8pt;margin:1.6mm 0;padding-left:6mm;position:relative;}
+.do li:before{content:"✔";position:absolute;left:0;color:#2E7D46;font-weight:bold;}
+.dont li:before{content:"✕";position:absolute;left:0;color:#B0403A;font-weight:bold;}
+/* data cards */
+.dcard{background:#EFF4EE;border-radius:9px;padding:4mm 5mm;margin-bottom:3mm;page-break-inside:avoid;}
+.dcard b{font-family:"Courier New",monospace;color:#1E4D2B;font-size:12pt;}
+.dcard p{font-size:10.8pt;color:#4a5a50;margin-top:1mm;}
+/* faq */
+.faq{background:#F6FAF5;border-left:0;border-radius:9px;padding:3.5mm 5mm;margin-bottom:2.5mm;page-break-inside:avoid;}
+.faq .q{font-weight:bold;color:#1E4D2B;font-size:11.5pt;}
+.faq .a{font-size:10.8pt;color:#43554a;margin-top:1mm;}
+/* note */
+.note{background:#FBF3DD;border-radius:7px;padding:3mm 5mm;font-size:10.8pt;color:#7a5a15;font-style:italic;margin-top:3mm;page-break-inside:avoid;}
+/* rules */
+.rule{display:flex;gap:4mm;align-items:center;margin:2.5mm 0;}
+.rule .n{flex:0 0 8mm;height:8mm;border-radius:50%;background:#E0A83B;color:#1B2A20;font-weight:bold;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;}
+.rule p{font-size:11.5pt;}
+.foot{text-align:center;color:#8aa090;font-size:9pt;margin-top:6mm;border-top:1px solid #dce6dd;padding-top:3mm;}
+</style></head><body>
+
+<div class="cover">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="emoji">🌾</div>
+  <div class="kick">SỔ TAY HƯỚNG DẪN</div>
+  <h1>MINI APP<br>THẠNH HƯƠNG</h1>
+  <div class="sub">Trợ lý Telegram giúp nhập liệu tự động: đọc căn cước, phiếu cân và ghi sổ mua lúa — chỉ bằng cách chụp ảnh và bấm nút.</div>
+  <div class="badge">📘 Tài liệu hướng dẫn nhân viên</div>
+  <div class="co">Nhà máy Xay xát Gạo Thạnh Hương</div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Giới thiệu</div>
+  <h2>Mini App Thạnh Hương là gì?</h2>
+  <div class="lead">Là một trợ lý chạy ngay trong <b>Telegram</b>. Nhân viên chỉ cần chụp ảnh giấy tờ, hệ thống <b>tự đọc và ghi dữ liệu</b> vào bảng tính — không phải nhập tay từng ô.</div>
+  <div class="grid">
+    <div class="bcard"><div class="ic">⏱️</div><div><h3>Nhanh</h3><p>Chụp ảnh ~15 giây là có dữ liệu.</p></div></div>
+    <div class="bcard"><div class="ic">✅</div><div><h3>Ít sai sót</h3><p>AI đọc số liệu, tự đánh dấu tấm cần kiểm tra.</p></div></div>
+    <div class="bcard"><div class="ic">📊</div><div><h3>Gọn gàng</h3><p>Dữ liệu gom một chỗ, xem trên điện thoại.</p></div></div>
+    <div class="bcard"><div class="ic">💰</div><div><h3>Tiết kiệm</h3><p>Chi phí gần như bằng 0, không tốn sổ sách.</p></div></div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Bắt đầu</div>
+  <h2>Chuẩn bị — 3 bước (làm 1 lần)</h2>
+  <div class="step"><div class="n g">1</div><div><h3>Cài Telegram</h3><p>Tải app Telegram (App Store / CH Play), đăng ký bằng số điện thoại của bạn.</p></div></div>
+  <div class="step"><div class="n g">2</div><div><h3>Mở bot & bấm START</h3><p>Bấm vào đường link bot do quản lý gửi (qua Zalo), rồi bấm nút <b>START</b>.</p></div></div>
+  <div class="step"><div class="n g">3</div><div><h3>Xin cấp quyền</h3><p>Lần đầu bot báo “chưa được cấp quyền” kèm một <b>MÃ SỐ</b>. Gửi mã đó cho quản lý để được mở khoá.</p></div></div>
+  <div class="note">💡 Xong 3 bước này là dùng mãi mãi, không phải làm lại.</div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Màn hình chính</div>
+  <h2>Gõ <span class="green">/start</span> — rồi bấm 4 nút</h2>
+  <div class="lead">Sau khi gõ <b>/start</b>, hãy <b>ĐÓNG bàn phím chữ</b> → 4 nút sẽ hiện sẵn ở khung nhập tin. Bấm nút là chạy, khỏi gõ lệnh.</div>
+  <div class="grid">
+    <div class="bcard"><div class="ic">🪪</div><div><h3>Thêm CCCD</h3><p>Chụp căn cước → lưu thông tin người bán.</p></div></div>
+    <div class="bcard"><div class="ic">⚖️</div><div><h3>Phiếu cân</h3><p>Chụp phiếu cân → ghi vào sổ cân.</p></div></div>
+    <div class="bcard"><div class="ic">🌾</div><div><h3>Mua lúa</h3><p>Gõ thông tin → ghi sổ mua lúa.</p></div></div>
+    <div class="bcard"><div class="ic">📊</div><div><h3>Báo cáo</h3><p>Xem tổng hợp trong ngày.</p></div></div>
+  </div>
+</div>
+
+<div class="sec secnew">
+  <div class="kicker">Chức năng 1</div>
+  <h2>🪪 Thêm CCCD người bán</h2>
+  <div class="step"><div class="n">1</div><div><h3>Bấm nút “🪪 Thêm CCCD”</h3><p>Bot trả lời: “Đã bật chế độ CCCD. Hãy gửi ảnh căn cước.”</p></div></div>
+  <div class="step"><div class="n">2</div><div><h3>Chụp / gửi ảnh căn cước</h3><p>Mỗi người 1 tấm ảnh riêng — chụp rõ mặt trước (và mặt sau nếu cần).</p></div></div>
+  <div class="step"><div class="n">3</div><div><h3>Đợi ~15 giây</h3><p>Bot báo “✅ Đã lưu CCCD” kèm họ tên, số CCCD, địa chỉ.</p></div></div>
+  <div class="step"><div class="n">4</div><div><h3>Dữ liệu tự vào bảng CCCD_DATA</h3><p>Không cần gõ tay. Tấm nào mờ, bot đánh dấu “Cần kiểm tra = CÓ”.</p></div></div>
+  <div class="note">💡 Nhớ BẤM NÚT trước rồi mới gửi ảnh — để bot biết đó là căn cước.</div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Chức năng 2</div>
+  <h2>⚖️ Chụp phiếu cân</h2>
+  <div class="step"><div class="n">1</div><div><h3>Bấm nút “⚖️ Phiếu cân”</h3><p>Bot trả lời: “Đã bật chế độ Phiếu cân. Hãy gửi ảnh phiếu cân.”</p></div></div>
+  <div class="step"><div class="n">2</div><div><h3>Gửi ảnh phiếu cân</h3><p>Được cả phiếu IN và phiếu VIẾT TAY. Chụp rõ các con số.</p></div></div>
+  <div class="step"><div class="n">3</div><div><h3>Bot đọc & kiểm tra</h3><p>Tự đọc loại hàng, số xe, trọng lượng, và kiểm tra phép trừ cân.</p></div></div>
+  <div class="step"><div class="n">4</div><div><h3>Ghi vào bảng PHIEU_CAN</h3><p>Bot báo kết quả. Nếu số cân lệch, tự gắn “Cần kiểm tra”.</p></div></div>
+  <div class="note">💡 Chụp thẳng, đủ sáng, thấy rõ số cân là bot đọc chuẩn nhất.</div>
+</div>
+
+<div class="sec secnew">
+  <div class="kicker">Chức năng 3</div>
+  <h2>🌾 Ghi mua lúa</h2>
+  <div class="lead">Gõ theo đúng mẫu, các phần ngăn nhau bằng dấu gạch đứng “|”:</div>
+  <div class="code"><span class="k">mua</span> | Tên người bán | Loại lúa | Số kg | Đơn giá</div>
+  <div class="lead" style="margin-top:3mm"><b>Ví dụ thực tế:</b></div>
+  <div class="ex">mua | Diệp Thành Hòa | OM5451 | 5200 | 8200</div>
+  <div style="margin-top:3mm">
+    <div class="dcard"><b>🔎 Tự tra người bán</b><p>Bot tìm trong CCCD_DATA, tự điền số CCCD + địa chỉ người bán.</p></div>
+    <div class="dcard"><b>🧮 Tự tính tiền</b><p>Số kg × đơn giá = thành tiền, khỏi bấm máy tính.</p></div>
+    <div class="dcard"><b>📒 Ghi sổ MUA_LUA</b><p>Lưu thành 1 dòng, xem lại bất cứ lúc nào.</p></div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Chức năng 4 &amp; 5</div>
+  <h2>Báo cáo &amp; Tra cứu nhanh</h2>
+  <div class="two">
+    <div class="col do" style="background:#EFF4EE">
+      <h3 class="green">📊 Báo cáo hôm nay</h3>
+      <p style="font-size:10.8pt;color:#43554a">Bấm nút <b>📊 Báo cáo</b>, bot trả về ngay:</p>
+      <ul style="margin-top:2mm">
+        <li style="padding-left:5mm">Số phiếu cân đã ghi</li>
+        <li style="padding-left:5mm">Tổng khối lượng hàng (kg)</li>
+        <li style="padding-left:5mm">Số phiếu cần kiểm tra lại</li>
+      </ul>
+    </div>
+    <div class="col" style="background:#FBF3DD">
+      <h3 class="green">🔎 Tra người bán</h3>
+      <p style="font-size:10.8pt;color:#43554a">Gõ nhanh để tìm lại thông tin đã lưu:</p>
+      <div class="ex" style="background:#fff">ai Diệp Thành Hòa</div>
+      <div class="ex" style="background:#fff">ai 052134002261</div>
+      <p style="font-size:10.2pt;color:#7a5a15;font-style:italic">→ Bot hiện họ tên, số CCCD, ngày sinh, địa chỉ.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec secnew">
+  <div class="kicker">Bí quyết</div>
+  <h2>Chụp ảnh sao cho bot đọc chuẩn</h2>
+  <div class="two">
+    <div class="col do"><h3 class="green">✅ NÊN LÀM</h3><ul>
+      <li>Chụp đủ sáng, rõ nét, không bị lóa</li>
+      <li>Đặt giấy tờ thẳng, thấy hết 4 góc</li>
+      <li>Mỗi căn cước chụp 1 tấm riêng</li>
+      <li>Dùng ảnh JPG/PNG bình thường</li></ul></div>
+    <div class="col dont"><h3 style="color:#B0403A">❌ TRÁNH</h3><ul>
+      <li>Ảnh mờ, tối, chụp nghiêng bị méo</li>
+      <li>Gộp nhiều căn cước trong 1 tấm</li>
+      <li>Ảnh HEIC (iPhone) — nên đổi sang JPG</li>
+      <li>Chụp thiếu góc, che mất số</li></ul></div>
+  </div>
+  <div class="note">Tấm nào bot không chắc, nó tự ghi “Cần kiểm tra = CÓ” để mình rà lại.</div>
+</div>
+
+<div class="sec">
+  <div class="kicker">Dữ liệu</div>
+  <h2>Mọi thứ lưu ở đâu?</h2>
+  <div class="lead">Tất cả gom vào <b>Google Sheets</b> (bảng tính) — xem được trên điện thoại và máy tính.</div>
+  <div class="dcard"><b>📇 CCCD_DATA</b><p>Thông tin căn cước người bán: họ tên, số CCCD, ngày sinh, địa chỉ...</p></div>
+  <div class="dcard"><b>⚖️ PHIEU_CAN</b><p>Các phiếu cân nhập/xuất: loại hàng, số xe, trọng lượng, độ ẩm...</p></div>
+  <div class="dcard"><b>📒 MUA_LUA</b><p>Sổ mua lúa: người bán, loại lúa, số kg, đơn giá, thành tiền.</p></div>
+  <div class="note">🔒 Đây là dữ liệu cá nhân — chỉ mở cho người có phận sự, không chia sẻ ra ngoài.</div>
+</div>
+
+<div class="sec secnew">
+  <div class="kicker">Khi gặp trục trặc</div>
+  <h2>Xử lý sự cố thường gặp</h2>
+  <div class="faq"><div class="q">❓ Không thấy nút bấm?</div><div class="a">Gõ /start một lần, rồi ĐÓNG bàn phím chữ — nút sẽ hiện ở khung nhập tin.</div></div>
+  <div class="faq"><div class="q">❓ Báo “chưa được cấp quyền”?</div><div class="a">Copy MÃ SỐ bot gửi, gửi cho quản lý để được thêm vào danh sách.</div></div>
+  <div class="faq"><div class="q">❓ Gửi ảnh mà bot im lặng?</div><div class="a">Đợi ~15 giây. Nếu vẫn im: kiểm tra đã bấm đúng nút chế độ chưa, ảnh có mờ không.</div></div>
+  <div class="faq"><div class="q">❓ Bot đọc sai thông tin?</div><div class="a">Mở bảng tính sửa lại tay. Lọc cột “Cần kiểm tra = CÓ” để soát nhanh.</div></div>
+</div>
+
+<div class="sec">
+  <div class="kicker">An toàn dữ liệu</div>
+  <h2 class="gold">🔒 Quy tắc vàng</h2>
+  <div class="rule"><div class="n">1</div><p>Không chia sẻ đường link bot cho người ngoài công ty.</p></div>
+  <div class="rule"><div class="n">2</div><p>Không dùng ảnh căn cước cho mục đích ngoài công việc.</p></div>
+  <div class="rule"><div class="n">3</div><p>Chỉ nhân viên được cấp quyền mới sử dụng bot.</p></div>
+  <div class="rule"><div class="n">4</div><p>Thấy sai sót thì báo quản lý, không tự ý sửa lung tung.</p></div>
+  <div class="foot">🌾 Mini App Thạnh Hương — Nhà máy Xay xát Gạo Thạnh Hương · Chúc cả nhà làm việc nhẹ nhàng &amp; hiệu quả!</div>
+</div>
+
+</body></html>
