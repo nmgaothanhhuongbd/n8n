@@ -1,6 +1,7 @@
 # 🌾 Mini App Thạnh Hương — chạy trên Google Apps Script (MIỄN PHÍ VĨNH VIỄN)
 
 Thay thế n8n. Không tốn tiền, không hết hạn, không cần server.
+Giao diện kiểu **ứng dụng**: bấm nút, bot hỏi từng bước, xem thẻ rồi bấm Lưu.
 Chạy ngay trên tài khoản Google của công ty.
 
 ---
@@ -88,9 +89,45 @@ const GEMINI_KEY = 'DAN_KHOA_GEMINI_AQ_VAO_DAY';
 ## 📱 PHẦN F — Thử nghiệm
 
 23. Mở **Telegram** → vào bot **ThạnhHương**
-24. Gõ **`/start`** → menu 4 nút hiện ra
-25. Bấm **🪪 Thêm CCCD** → gửi 1 ảnh căn cước → chờ ~15 giây → bot báo "✅ Đã lưu CCCD"
+24. Gõ **`/start`** → hiện màn hình chính với các nút
+25. Bấm **🪪 Thêm căn cước** → gửi 1 ảnh → bot đọc xong hiện **thẻ thông tin** → bấm **✅ Lưu vào sổ**
 26. Mở Google Sheet **CCCD_DATA** kiểm tra dòng mới
+
+---
+
+## 🎮 CÁCH DÙNG (kiểu ứng dụng — không cần nhớ cú pháp)
+
+Mọi thao tác đều **bấm nút**. Bot hỏi từng câu, trả lời xong hiện **thẻ xem lại**, ưng thì bấm Lưu.
+
+### 🪪 Thêm căn cước
+1. Bấm **🪪 Thêm căn cước**
+2. Gửi ảnh căn cước
+3. Bot hiện thẻ: họ tên, số CCCD, ngày sinh, địa chỉ...
+4. Bấm **✅ Lưu vào sổ** — hoặc **✏️ Sửa lại** nếu AI đọc sai ô nào
+
+### ⚖️ Phiếu cân
+Y hệt: bấm nút → gửi ảnh → xem thẻ → Lưu.
+Nếu số cân bị lệch, bot tự cảnh báo ngay trên thẻ.
+
+### 🌾 Ghi mua lúa — bot hỏi 4 câu
+1. Bấm **🌾 Ghi mua lúa**
+2. **Người bán?** → bấm chọn tên đã mua gần đây, hoặc "✍️ Nhập tên khác"
+3. **Loại lúa?** → bấm chọn (OM5451, Đài Thơm 8, IR50404, ST24...) hoặc nhập
+4. **Bao nhiêu kg?** → gõ số
+5. **Đơn giá?** → bấm chọn giá cũ hoặc gõ số
+6. Bot hiện thẻ đã **tự tính thành tiền** + **tự điền căn cước** người bán → bấm **✅ Lưu**
+
+### 📊 Báo cáo
+Bấm **📊 Báo cáo** → chọn **Hôm nay / Tuần này / Tháng này**.
+Xem được cả phiếu cân lẫn tiền mua lúa.
+
+### 🔎 Tra người bán
+Bấm **🔎 Tra cứu** → gõ tên (không dấu cũng được) hoặc số CCCD → bấm vào kết quả để xem chi tiết.
+
+### ✏️ Sửa khi AI đọc sai
+Trên thẻ bấm **✏️ Sửa lại** → chọn ô cần sửa → gõ lại → thẻ tự cập nhật → **✅ Lưu**.
+
+> 💡 **Không có gì phải học thuộc.** Không cú pháp, không dấu gạch đứng. Cứ bấm nút và trả lời.
 
 ---
 
