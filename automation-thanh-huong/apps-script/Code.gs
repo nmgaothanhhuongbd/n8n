@@ -35,10 +35,9 @@ function doPost(e){
 
 // ============ ĐIỀU HƯỚNG ============
 function route(upd){
-  if (upd.update_id){
-    const c=CacheService.getScriptCache(), k='u'+upd.update_id;
-    if (c.get(k)) return; c.put(k,'1',600);
-  }
+  // Telegram gửi lại tin khi script xử lý lâu -> phải chặn chạy trùng.
+  // Dùng KHOÁ để 2 bản chạy song song không cùng thấy "chưa xử lý".
+  if (upd.update_id && seen('u'+upd.update_id, 900)) return;
 
   // ---- Bấm nút trong thẻ (inline) ----
   if (upd.callback_query){
@@ -54,6 +53,10 @@ function route(upd){
   if (!allowed(uid)) { send(chatId, denyText(uid)); return; }
 
   const text=(msg.text||'').trim();
+  // chỉ chống bấm dồn cho NÚT MENU (không chặn câu trả lời của nhân viên,
+  // vì họ có thể gõ trùng số như 5200 kg rồi 5200 đ)
+  const isNav = /^\/?start\b/i.test(text) || /[🏠🪪⚖️🌾📊🔎]/.test(text);
+  if (isNav && seen('a'+chatId+'|'+text, 4)) return;
   const photo=(msg.photo&&msg.photo.length) ? msg.photo[msg.photo.length-1].file_id
             : (msg.document&&(msg.document.mime_type||'').indexOf('image/')===0 ? msg.document.file_id : null);
 
@@ -77,20 +80,14 @@ function route(upd){
 
 // ============ MÀN HÌNH CHÍNH ============
 function showHome(chatId){
-  send(chatId,
-    '🌾 *MINI APP THẠNH HƯƠNG*\n\nChọn việc cần làm 👇',
-    kbInline([
-      [btn('🪪 Thêm căn cước','m:cccd'), btn('⚖️ Phiếu cân','m:can')],
-      [btn('🌾 Ghi mua lúa','m:mua')],
-      [btn('📊 Báo cáo','m:bc'), btn('🔎 Tra người bán','m:tra')]
-    ]), true);
-  // thanh điều hướng cố định dưới bàn phím
-  tgApi('sendMessage',{chat_id:chatId, text:'⌨️ Thanh điều hướng đã sẵn sàng.',
+  tgApi('sendMessage', {chat_id:chatId,
+    text:'\uD83C\uDF3E MINI APP THẠNH HƯƠNG\n\nChọn việc cần làm ở thanh nút bên dưới \uD83D\uDC47',
     reply_markup:{keyboard:[[{text:'🪪 Căn cước'},{text:'⚖️ Phiếu cân'}],
                             [{text:'🌾 Mua lúa'},{text:'📊 Báo cáo'}],
                             [{text:'🔎 Tra cứu'},{text:'🏠 Trang chính'}]],
                   resize_keyboard:true, is_persistent:true}});
 }
+
 
 // ============ XỬ LÝ NÚT ============
 function onButton(chatId, data, mid){
@@ -160,7 +157,7 @@ function askStep(chatId, st, forceType){
       send(chatId,'🌾 *GHI MUA LÚA*  (bước 1/4)\n\n👤 Người bán là ai?',
         kbInline(chunk(names.map((n,i)=>btn(n,'pick:'+i)),2).concat([[btn('✍️ Nhập tên khác','pick:new')],[btn('🏠 Huỷ','m:menu')]])), true);
     } else {
-      send(chatId,'🌾 *GHI MUA LÚA*  (bước 1/4)\n\n👤 Gõ *tên người bán*:',null,true);
+      send(chatId,'🌾 *GHI MUA LÚA*  (bước 1/4)\n\n👤 Gõ *tên người bán* rồi gửi:',kbInline([[btn('🏠 Huỷ','m:menu')]]),true);
     }
     return;
   }
@@ -170,17 +167,17 @@ function askStep(chatId, st, forceType){
     if (!forceType){
       send(chatId,'🌾 *Bước 2/4*\n\n🌱 Loại lúa gì?',
         kbInline(chunk(kinds.map((n,i)=>btn(n,'pick:'+i)),2).concat([[btn('✍️ Nhập loại khác','pick:new')],[btn('🏠 Huỷ','m:menu')]])), true);
-    } else send(chatId,'🌱 Gõ *loại lúa*:',null,true);
+    } else send(chatId,'🌱 Gõ *loại lúa* rồi gửi:',kbInline([[btn('🏠 Huỷ','m:menu')]]),true);
     return;
   }
-  if (s==='kg'){ send(chatId,'🌾 *Bước 3/4*\n\n⚖️ Cân được bao nhiêu *kg*?\n_Chỉ gõ con số, ví dụ: 5200_',null,true); return; }
+  if (s==='kg'){ send(chatId,'🌾 *Bước 3/4*\n\n⚖️ Cân được bao nhiêu *kg*?\n_Chỉ gõ con số, ví dụ: 5200_',kbInline([[btn('🏠 Huỷ','m:menu')]]),true); return; }
   if (s==='gia'){
     const prices=uniq(recentValues(SHEET_MUA,TAB_MUA,'Đơn giá',4).filter(String));
     st.list=prices; setState(chatId,st);
     if (!forceType && prices.length){
       send(chatId,'🌾 *Bước 4/4*\n\n💵 Đơn giá bao nhiêu *đồng/kg*?',
         kbInline(chunk(prices.map((n,i)=>btn(fmt(n)+' đ','pick:'+i)),2).concat([[btn('✍️ Nhập giá khác','pick:new')],[btn('🏠 Huỷ','m:menu')]])), true);
-    } else send(chatId,'💵 Gõ *đơn giá* (đồng/kg):',null,true);
+    } else send(chatId,'💵 Gõ *đơn giá* (đồng/kg):',kbInline([[btn('🏠 Huỷ','m:menu')]]),true);
     return;
   }
 }
@@ -354,6 +351,16 @@ function doBaoCao(chatId, kind, mid){
 }
 
 // ============ TIỆN ÍCH ============
+// Đánh dấu "đã xử lý". Dùng khoá để 2 bản chạy song song không lọt cả hai.
+function seen(key, ttl){
+  const c=CacheService.getScriptCache(), lock=LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch(e) { return false; }   // không lấy được khoá thì cứ chạy
+  try {
+    if (c.get(key)) return true;
+    c.put(key, '1', ttl);
+    return false;
+  } finally { try{ lock.releaseLock(); }catch(e){} }
+}
 function allowed(uid){ return ALLOWED.indexOf(Number(uid))>=0; }
 function denyText(uid){ return '⛔ Bạn chưa được cấp quyền dùng ứng dụng này.\n\nMã của bạn: '+uid+'\nGửi mã này cho quản lý để được mở khoá.'; }
 function P(){ return PropertiesService.getScriptProperties(); }
