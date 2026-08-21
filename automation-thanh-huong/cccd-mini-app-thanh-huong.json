@@ -1,0 +1,1117 @@
+{
+  "name": "🌾 Mini App Thạnh Hương (Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "66378ece-c9cd-412c-908f-e29a83a4989c",
+      "name": "Nhận Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -580,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 🧭 Định tuyến + 🔒 chặn người lạ\nconst sd = $getWorkflowStaticData('global');\nconst upd = $json;\nconst key = (id) => 'mode_' + id;\n\n// ====== NHÂN VIÊN ĐƯỢC PHÉP DÙNG BOT — thêm ID vào đây, mỗi người 1 dòng ======\nconst ALLOWED = [\n  8594134233,   // Sếp (chủ)\n];\n// ============================================================================\n\nlet out = { route: 'MENU' };\n\n// Lấy chatId + userId (dùng cho cả tin nhắn và nút bấm)\nlet chatId = '', userId = '';\nif (upd.callback_query) {\n  const cq = upd.callback_query;\n  chatId = (cq.message && cq.message.chat && cq.message.chat.id) || (cq.from && cq.from.id);\n  userId = cq.from && cq.from.id;\n} else if (upd.message) {\n  chatId = (upd.message.chat && upd.message.chat.id) || (upd.message.from && upd.message.from.id);\n  userId = upd.message.from && upd.message.from.id;\n}\nout.chatId = chatId;\n\n// 🔒 Chặn người ngoài danh sách\nif (!ALLOWED.includes(Number(userId))) {\n  out.route = 'MODE_SET';\n  out.modeText = '⛔ Bạn chưa được cấp quyền dùng bot này.\\nMã của bạn: ' + userId + '\\nGửi mã này cho quản lý để được thêm vào.';\n  return { json: out };\n}\n\n// ===== Đã qua kiểm tra quyền — định tuyến bình thường =====\nif (upd.callback_query) {\n  const data = upd.callback_query.data || '';\n  if (data === 'mode_cccd') { sd[key(chatId)] = 'cccd'; out.route='MODE_SET'; out.modeText='🪪 Đã bật chế độ CCCD.\\nHãy GỬI ẢNH căn cước công dân (mặt trước, hoặc cả 2 mặt) ngay bây giờ.'; }\n  else if (data === 'mode_can') { sd[key(chatId)] = 'can'; out.route='MODE_SET'; out.modeText='⚖️ Đã bật chế độ Phiếu cân.\\nHãy GỬI ẢNH phiếu cân ngay bây giờ.'; }\n  else if (data === 'help_mua') { out.route='MODE_SET'; out.modeText='🌾 Ghi mua lúa — gõ theo mẫu (ngăn bằng dấu |):\\nmua | Tên người bán | Loại lúa | Số kg | Đơn giá\\n\\nVí dụ:\\nmua | Diệp Thành Hòa | OM5451 | 5200 | 8200\\n\\n🔎 Tra người bán đã lưu: gõ  ai Tên  hoặc  ai Số_CCCD'; }\n  else if (data === 'act_baocao') { out.route='BAOCAO'; }\n  else { out.route='MENU'; }\n}\nelse if (upd.message) {\n  const msg = upd.message;\n  out.messageId = msg.message_id || '';\n  const t = (msg.text || '').trim();\n  const low = t.toLowerCase();\n  const has = (s) => t.indexOf(s) !== -1;\n  const hasPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;\n  const doc = msg.document;\n  const isImg = doc && (doc.mime_type || '').indexOf('image/') === 0;\n  const muaHelp = '🌾 Ghi mua lúa — gõ theo mẫu (ngăn bằng dấu |):\\nmua | Tên người bán | Loại lúa | Số kg | Đơn giá\\n\\nVí dụ:\\nmua | Diệp Thành Hòa | OM5451 | 5200 | 8200\\n\\n🔎 Tra người bán đã lưu: gõ  ai Tên  hoặc  ai Số_CCCD';\n\n  if (/^\\/?start\\b/i.test(t) || has('🏠') || low === 'menu') out.route='MENU';\n  else if (has('🪪') || /^(cccd|căn cước|can cuoc)\\b/i.test(low)) { sd[key(chatId)]='cccd'; out.route='MODE_SET'; out.modeText='🪪 Đã bật chế độ CCCD. Gửi ẢNH căn cước ngay bây giờ.'; }\n  else if (has('⚖️') || /^(phiếu cân|phieu can|cân|can)\\b/i.test(low)) { sd[key(chatId)]='can'; out.route='MODE_SET'; out.modeText='⚖️ Đã bật chế độ Phiếu cân. Gửi ẢNH phiếu cân ngay bây giờ.'; }\n  else if (/^mua\\b/i.test(low) && has('|')) { out.route='MUA'; out.text=t; }\n  else if (has('🌾') || /^mua\\b/i.test(low)) { out.route='MODE_SET'; out.modeText=muaHelp; }\n  else if (has('📊') || /^(bc|báo cáo|bao cao)\\b/i.test(low)) out.route='BAOCAO';\n  else if (/^ai\\b/i.test(low)) { out.route='TRA'; out.text=t; }\n  else if (hasPhoto || isImg) {\n    out.fileId = hasPhoto ? msg.photo[msg.photo.length-1].file_id : doc.file_id;\n    const mode = sd[key(chatId)] || 'can';\n    out.mode = mode;\n    out.route = (mode === 'cccd') ? 'CCCD' : 'CAN';\n  }\n  else out.route='MENU';\n}\nreturn { json: out };\n"
+      },
+      "id": "e8be5a6d-a1bf-41fa-8a5b-a6afdab6e68f",
+      "name": "Định tuyến",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "1cecc1b0-167b-47dc-9f6e-5646ff1c6f63",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "MENU",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "MENU"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "6344b911-56da-4949-9eb4-e4dee3c62510",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "MODE_SET",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "MODE_SET"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "70ada90d-f5eb-4e04-b977-a23b632141d1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "CCCD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CCCD"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "1f85b60e-fbfc-484c-9872-1f2bd0384e6f",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "CAN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CAN"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "7cf7acf7-c226-4ff7-ac37-f964c15eb924",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "MUA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "MUA"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "5b989d62-be57-40b3-8827-f97a50cde57c",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "TRA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TRA"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "389450f9-2303-4809-9e9f-efbcd5832d54",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "BAOCAO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "BAOCAO"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6fc867b-6cd9-4a0f-97f9-794e535040b5",
+      "name": "Chia nhánh",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -140,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=🌾 MINI APP THẠNH HƯƠNG\nCác nút đã hiện sẵn ở ô nhập tin phía dưới 👇\nBấm nút để dùng (khỏi gõ lệnh):\n\n🪪 Thêm CCCD → rồi gửi ảnh căn cước\n⚖️ Phiếu cân → rồi gửi ảnh phiếu cân\n🌾 Mua lúa → xem cách ghi\n📊 Báo cáo → tổng hợp hôm nay",
+        "additionalFields": {
+          "appendAttribution": false
+        },
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🪪 Thêm CCCD"
+                  },
+                  {
+                    "text": "⚖️ Phiếu cân"
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🌾 Mua lúa"
+                  },
+                  {
+                    "text": "📊 Báo cáo"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": false
+        }
+      },
+      "id": "dcadd459-f391-47b7-bf30-d55b13c79125",
+      "name": "🏠 Gửi menu",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        -200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.modeText }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "6668d058-8901-4871-bbf2-d544f95276f0",
+      "name": "Xác nhận chế độ",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        -40
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "ce89e357-fcfd-41b9-979c-cc0cd5284e4f",
+      "name": "Tải ảnh CCCD",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Ảnh CCCD -> base64 + body Gemini\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64 = buffer.toString('base64');\nconst bin = $input.item.binary && $input.item.binary.data ? $input.item.binary.data : {};\nconst mimeType = bin.mimeType || 'image/jpeg';\nconst r = $('Định tuyến').item.json;\nconst prompt = \"Bạn là trợ lý nhập liệu. Ảnh là CĂN CƯỚC CÔNG DÂN (CCCD) Việt Nam - mặt trước, mặt sau hoặc cả hai. Đọc kỹ, trích xuất TẤT CẢ thông tin. CHỈ TRẢ VỀ 1 object JSON:\\n{\\n  \\\"so_cccd\\\": \\\"số CCCD 12 chữ số hoặc số CMND cũ\\\",\\n  \\\"ho_ten\\\": \\\"họ tên đầy đủ, VIẾT HOA\\\",\\n  \\\"ngay_sinh\\\": \\\"DD/MM/YYYY\\\",\\n  \\\"gioi_tinh\\\": \\\"Nam hoặc Nữ\\\",\\n  \\\"quoc_tich\\\": \\\"quốc tịch\\\",\\n  \\\"que_quan\\\": \\\"quê quán đầy đủ\\\",\\n  \\\"noi_thuong_tru\\\": \\\"nơi thường trú đầy đủ\\\",\\n  \\\"co_gia_tri_den\\\": \\\"ngày hết hạn hoặc chữ\\\",\\n  \\\"ngay_cap\\\": \\\"DD/MM/YYYY mặt sau\\\",\\n  \\\"noi_cap\\\": \\\"nơi cấp\\\",\\n  \\\"dac_diem_nhan_dang\\\": \\\"nếu có\\\",\\n  \\\"do_tin_cay\\\": \\\"cao | trung bình | thấp\\\",\\n  \\\"can_kiem_tra\\\": true hoặc false,\\n  \\\"ly_do_kiem_tra\\\": \\\"lý do, rỗng nếu không\\\"\\n}\\nTrường không thấy để rỗng. Không bịa.\";\nreturn { json: {\n  chatId: r.chatId,\n  messageId: r.messageId || '',\n  fileName: bin.fileName || ('cccd_' + (r.messageId || '') + '.jpg'),\n  body: { contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } } ] }], generationConfig: { temperature: 0, response_mime_type: 'application/json' } }\n} };"
+      },
+      "id": "ff3587be-4db4-44f4-ae56-6984759515f5",
+      "name": "Chuẩn bị CCCD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d2288a36-d11a-498e-bbba-9268d39ce00a",
+      "name": "Gemini đọc CCCD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        120
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GEMINI_CRED",
+          "name": "Gemini API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// JSON Gemini -> cột CCCD_DATA\nconst prep = $('Chuẩn bị CCCD').item.json;\nconst fileName = prep.fileName;\nlet text=''; try{ text=$json.candidates[0].content.parts[0].text; }catch(e){ text=''; }\nlet clean=(text||'').trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();\nlet data={}; let parseError='';\ntry{ data=JSON.parse(clean); }catch(e){ parseError='Không đọc được JSON từ AI'; }\nconst conf=String(data.do_tin_cay||'').toLowerCase();\nconst lowConf=conf.includes('thấp')||conf.includes('thap')||conf==='low';\nconst aiFlag=data.can_kiem_tra===true||data.can_kiem_tra==='true';\nconst missing=[]; if(!data.so_cccd)missing.push('số CCCD'); if(!data.ho_ten)missing.push('họ tên'); if(!text)missing.push('OCR trống');\nconst needs=!!(parseError||lowConf||aiFlag||missing.length);\nconst reasons=[]; if(parseError)reasons.push(parseError); if(missing.length)reasons.push('Thiếu/khó đọc: '+missing.join(', ')); if(lowConf)reasons.push('AI báo độ tin cậy thấp'); if(aiFlag&&data.ly_do_kiem_tra)reasons.push(data.ly_do_kiem_tra);\nreturn { json: {\n  'Thời gian xử lý': new Date().toISOString(),\n  'Tên file': fileName || '',\n  'Link ảnh': prep.messageId ? ('telegram-msg-' + prep.messageId) : '',\n  'Số CCCD': data.so_cccd || '',\n  'Họ và tên': data.ho_ten || '',\n  'Ngày sinh': data.ngay_sinh || '',\n  'Giới tính': data.gioi_tinh || '',\n  'Quốc tịch': data.quoc_tich || '',\n  'Quê quán': data.que_quan || '',\n  'Nơi thường trú': data.noi_thuong_tru || '',\n  'Có giá trị đến': data.co_gia_tri_den || '',\n  'Ngày cấp': data.ngay_cap || '',\n  'Nơi cấp': data.noi_cap || '',\n  'Đặc điểm nhận dạng': data.dac_diem_nhan_dang || '',\n  'Độ tin cậy': data.do_tin_cay || '',\n  'Cần kiểm tra': needs ? 'CÓ' : 'Không',\n  'Lý do kiểm tra': reasons.join('; ')\n} };"
+      },
+      "id": "ab790b10-7e7f-409e-b7da-bc3e55844952",
+      "name": "Tách CCCD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1NVaYQypE11CB0r3aK7C1EE2pr4hR13YLvnLxxRS03x0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CCCD_DATA",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "3f6d6709-4be7-4929-aa73-4d45fc52c1bf",
+      "name": "Ghi CCCD",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        920,
+        120
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chuẩn bị CCCD').item.json.chatId }}",
+        "text": "=✅ Đã lưu CCCD:\n• Họ tên: {{ $('Tách CCCD').item.json['Họ và tên'] || '(chưa rõ)' }}\n• Số CCCD: {{ $('Tách CCCD').item.json['Số CCCD'] || '?' }}\n• Địa chỉ: {{ $('Tách CCCD').item.json['Nơi thường trú'] || '-' }}\n• Cần kiểm tra: {{ $('Tách CCCD').item.json['Cần kiểm tra'] }}\n• Lý do: {{ $('Tách CCCD').item.json['Lý do kiểm tra'] || '(không)' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "2e4dc759-9abd-4bcc-84e1-8493698cf3d4",
+      "name": "Trả lời CCCD",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "db27d00e-805e-43eb-a95d-98955c92bd74",
+      "name": "Tải ảnh cân",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Ảnh phiếu cân -> base64 + body Gemini\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64 = buffer.toString('base64');\nconst bin = $input.item.binary && $input.item.binary.data ? $input.item.binary.data : {};\nconst mimeType = bin.mimeType || 'image/jpeg';\nconst r = $('Định tuyến').item.json;\nconst prompt = \"Bạn là trợ lý kế toán đọc PHIẾU CÂN của nhà máy xay xát gạo Thạnh Hương. Ảnh có thể là phiếu IN hoặc VIẾT TAY. Đọc kỹ kể cả chữ tay và phép tính. CHỈ TRẢ VỀ 1 object JSON:\\n{\\n  \\\"ngay\\\": \\\"DD/MM/YYYY\\\",\\n  \\\"so_phieu\\\": \\\"số phiếu\\\",\\n  \\\"nguoi_ban_khach_hang\\\": \\\"tên người bán/khách\\\",\\n  \\\"loai_hang_lua\\\": \\\"loại hàng/lúa\\\",\\n  \\\"so_xe\\\": \\\"biển số xe\\\",\\n  \\\"tl_xe_vao\\\": \\\"kg\\\",\\n  \\\"tl_xe_ra\\\": \\\"kg\\\",\\n  \\\"tl_hang\\\": \\\"kg\\\",\\n  \\\"do_am\\\": \\\"% nếu có\\\",\\n  \\\"kieu_can\\\": \\\"NHẬP hay XUẤT\\\",\\n  \\\"ghi_chu_chat_luong\\\": \\\"tạp chất/đơn giá/thành tiền\\\",\\n  \\\"nguoi_can\\\": \\\"người cân\\\",\\n  \\\"do_tin_cay\\\": \\\"cao | trung bình | thấp\\\",\\n  \\\"can_kiem_tra\\\": true hoặc false,\\n  \\\"ly_do_kiem_tra\\\": \\\"lý do\\\"\\n}\\nTrường không có để rỗng. Số cân chỉ ghi con số, không kèm 'kg', không dấu phẩy nghìn.\";\nreturn { json: {\n  chatId: r.chatId,\n  messageId: r.messageId || '',\n  fileName: bin.fileName || ('phieucan_' + (r.messageId || '') + '.jpg'),\n  body: { contents: [{ parts: [ { text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } } ] }], generationConfig: { temperature: 0, response_mime_type: 'application/json' } }\n} };"
+      },
+      "id": "d3834a80-500b-4f5b-bd37-52ce4b7a6d96",
+      "name": "Chuẩn bị cân",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "7df6b2dd-3707-4f6d-8a8d-537a5af8fb59",
+      "name": "Gemini đọc cân",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_GEMINI_CRED",
+          "name": "Gemini API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// JSON Gemini -> cột PHIEU_CAN + kiểm tra số cân\nconst prep = $('Chuẩn bị cân').item.json;\nconst fileName = prep.fileName;\nlet text=''; try{ text=$json.candidates[0].content.parts[0].text; }catch(e){ text=''; }\nlet clean=(text||'').trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();\nlet data={}; let parseError='';\ntry{ data=JSON.parse(clean); }catch(e){ parseError='Không đọc được JSON từ AI'; }\nconst toNum=(s)=>{ if(s===null||s===undefined||s==='')return null; const n=Number(String(s).replace(/[^0-9.\\-]/g,'')); return isNaN(n)?null:n; };\nconst vao=toNum(data.tl_xe_vao), ra=toNum(data.tl_xe_ra); let hang=toNum(data.tl_hang);\nif(hang===null && vao!==null && ra!==null) hang=Math.abs(vao-ra);\nlet mathOk=true, mathNote='';\nif(vao!==null && ra!==null && hang!==null){ const diff=Math.abs(Math.abs(vao-ra)-hang); if(diff>Math.max(20,hang*0.01)){ mathOk=false; mathNote='Lệch cân: |'+vao+'-'+ra+'| khác '+hang; } }\nconst conf=String(data.do_tin_cay||'').toLowerCase();\nconst lowConf=conf.includes('thấp')||conf.includes('thap')||conf==='low';\nconst aiFlag=data.can_kiem_tra===true||data.can_kiem_tra==='true';\nconst needs=!!(parseError||lowConf||!mathOk||aiFlag);\nconst reasons=[]; if(parseError)reasons.push(parseError); if(lowConf)reasons.push('AI báo độ tin cậy thấp'); if(!mathOk)reasons.push(mathNote); if(aiFlag&&data.ly_do_kiem_tra)reasons.push(data.ly_do_kiem_tra); else if(aiFlag)reasons.push('AI đánh dấu cần kiểm tra');\nreturn { json: {\n  'Thời gian xử lý': new Date().toISOString(),\n  'Tên file': fileName||'',\n  'Link ảnh': prep.messageId ? ('telegram-msg-'+prep.messageId) : '',\n  'Ngày phiếu': data.ngay||'',\n  'Số phiếu': data.so_phieu||'',\n  'Người bán / Khách hàng': data.nguoi_ban_khach_hang||'',\n  'Loại hàng / lúa': data.loai_hang_lua||'',\n  'Số xe': data.so_xe||'',\n  'TL xe vào (kg)': vao!==null?vao:'',\n  'TL xe ra (kg)': ra!==null?ra:'',\n  'TL hàng (kg)': hang!==null?hang:'',\n  'Độ ẩm (%)': data.do_am||'',\n  'Kiểu cân': data.kieu_can||'',\n  'Ghi chú chất lượng': data.ghi_chu_chat_luong||'',\n  'Người cân': data.nguoi_can||'',\n  'Độ tin cậy': data.do_tin_cay||'',\n  'Cần kiểm tra': needs?'CÓ':'Không',\n  'Lý do kiểm tra': reasons.join('; ')\n} };"
+      },
+      "id": "8cbae9a4-7d6f-4e1c-af67-a24f0f6a3059",
+      "name": "Tách cân",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hg_fTt3wnlOyCkW-u1OqBRQDR9lmMclt_oChHtPPh1s",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "f694a322-302d-41c6-aaa6-826823091113",
+      "name": "Ghi cân",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        920,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Chuẩn bị cân').item.json.chatId }}",
+        "text": "=✅ Đã ghi phiếu cân:\n• Loại hàng: {{ $('Tách cân').item.json['Loại hàng / lúa'] || '(chưa rõ)' }}\n• TL hàng: {{ $('Tách cân').item.json['TL hàng (kg)'] || '?' }} kg\n• Số xe: {{ $('Tách cân').item.json['Số xe'] || '-' }}\n• Cần kiểm tra: {{ $('Tách cân').item.json['Cần kiểm tra'] }}\n• Lý do: {{ $('Tách cân').item.json['Lý do kiểm tra'] || '(không)' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "8c5ce226-b64f-475b-8464-5034e405b184",
+      "name": "Trả lời cân",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Phân tích lệnh mua lúa\nconst r = $('Định tuyến').item.json;\nconst raw = (r.text || '');\nlet p = raw.replace(/^mua\\s*[:|]?\\s*/i,'').split('|').map(s=>s.trim());\nconst ten=p[0]||'', loai=p[1]||'', kg=p[2]||'', gia=p[3]||'';\nconst kgN=Number(String(kg).replace(/[^0-9.]/g,''))||0;\nconst giaN=Number(String(gia).replace(/[^0-9.]/g,''))||0;\nreturn { json: { chatId:r.chatId, ten, loai, kg:kgN, gia:giaN, thanhtien:kgN*giaN } };"
+      },
+      "id": "f2fb67f8-f644-45c0-96f3-12776222767a",
+      "name": "Phân tích mua",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1NVaYQypE11CB0r3aK7C1EE2pr4hR13YLvnLxxRS03x0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CCCD_DATA",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "f3b30573-9628-4500-876f-fc400cf5f4b8",
+      "name": "Đọc danh bạ CCCD",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        320,
+        480
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Ghép thông tin người bán từ CCCD_DATA (nếu có)\nconst rows = $input.all().map(i=>i.json);\nconst mua = $('Phân tích mua').first().json;\nconst norm = s => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/đ/g,'d').replace(/\\s+/g,' ').trim();\nconst key = norm(mua.ten);\nconst digits = (mua.ten||'').replace(/\\D/g,'');\nlet m=null;\nfor(const row of rows){\n  const name=norm(row['Họ và tên']); const cccd=(row['Số CCCD']||'').toString();\n  if(digits && digits.length>=9 && cccd===digits){ m=row; break; }\n  if(key && name && (name.includes(key)||key.includes(name))){ m=row; break; }\n}\nreturn { json: {\n  'Thời gian': new Date().toISOString(),\n  'Người bán': (m&&m['Họ và tên'])||mua.ten,\n  'Số CCCD': (m&&m['Số CCCD'])||'',\n  'Địa chỉ (thường trú)': (m&&m['Nơi thường trú'])||'',\n  'Loại lúa': mua.loai,\n  'Số kg': mua.kg,\n  'Đơn giá': mua.gia,\n  'Thành tiền': mua.thanhtien\n} };"
+      },
+      "id": "da614c9b-cef1-459a-9a9e-162f3f445af2",
+      "name": "Ghép người bán",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "16G_mtGe3emQwrJBEyjijLZnGpmlyuQcEFqIuUJb3D8o",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "MUA_LUA",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "d7ffbc4c-f2de-4104-a932-d1d84432633a",
+      "name": "Ghi mua lúa",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        720,
+        480
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Phân tích mua').first().json.chatId }}",
+        "text": "=✅ Đã ghi sổ MUA LÚA:\n• Người bán: {{ $('Ghép người bán').first().json['Người bán'] }}\n• Số CCCD: {{ $('Ghép người bán').first().json['Số CCCD'] || '(chưa có trong danh bạ)' }}\n• Địa chỉ: {{ $('Ghép người bán').first().json['Địa chỉ (thường trú)'] || '-' }}\n• Loại lúa: {{ $('Phân tích mua').first().json.loai || '-' }}\n• Khối lượng: {{ $('Phân tích mua').first().json.kg }} kg × {{ $('Phân tích mua').first().json.gia }} đ\n• 💰 Thành tiền: {{ Number($('Phân tích mua').first().json.thanhtien).toLocaleString('vi-VN') }} đ",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d5ef37e9-2eb5-4503-aaab-de5ea01f2de2",
+      "name": "Trả lời mua",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        920,
+        480
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const r=$('Định tuyến').item.json;\nconst q=(r.text||'').replace(/^ai\\s*/i,'').trim();\nreturn { json: { chatId:r.chatId, q } };"
+      },
+      "id": "587f43d2-1fe8-4b81-95e5-21352bf6a811",
+      "name": "Tìm người bán",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1NVaYQypE11CB0r3aK7C1EE2pr4hR13YLvnLxxRS03x0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CCCD_DATA",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "c2be5e36-7284-4603-a0f3-ae13eb96d0a0",
+      "name": "Đọc CCCD (tra)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        320,
+        660
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Tra người bán trong CCCD_DATA\nconst rows=$input.all().map(i=>i.json);\nconst q=$('Tìm người bán').first().json.q;\nconst chatId=$('Tìm người bán').first().json.chatId;\nconst norm=s=>(s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/đ/g,'d').replace(/\\s+/g,' ').trim();\nconst key=norm(q); const digits=(q||'').replace(/\\D/g,'');\nconst hits=[];\nfor(const row of rows){ const name=norm(row['Họ và tên']); const cccd=(row['Số CCCD']||'').toString();\n  if((digits && digits.length>=9 && cccd.includes(digits)) || (key && name && name.includes(key))) hits.push(row); }\nlet text;\nif(!q) text='Gõ:  ai Tên  hoặc  ai Số_CCCD  để tra người bán.';\nelse if(!hits.length) text='🔎 Không tìm thấy người bán khớp \"'+q+'\" trong danh bạ CCCD.';\nelse { text='🔎 Tìm thấy '+hits.length+' người bán:\\n\\n'+hits.slice(0,5).map(h=>('👤 '+(h['Họ và tên']||'')+'\\n• CCCD: '+(h['Số CCCD']||'-')+'\\n• Ngày sinh: '+(h['Ngày sinh']||'-')+'\\n• Địa chỉ: '+(h['Nơi thường trú']||'-'))).join('\\n\\n'); }\nreturn { json: { chatId, text } };"
+      },
+      "id": "4f3926ee-80aa-4478-9404-657816524c72",
+      "name": "Kết quả tra",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Kết quả tra').first().json.chatId }}",
+        "text": "={{ $('Kết quả tra').first().json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "95b7426d-ca98-402c-8008-45c563181e4d",
+      "name": "Trả lời tra",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        660
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hg_fTt3wnlOyCkW-u1OqBRQDR9lmMclt_oChHtPPh1s",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "0429d379-89f4-463a-8f32-66e0ff215cbe",
+      "name": "Đọc phiếu cân",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        120,
+        840
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Thanh Huong"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Đếm phiếu cân hôm nay\nconst rows=$input.all().map(i=>i.json);\nconst chatId=$('Định tuyến').first().json.chatId;\nconst now=new Date(); const y=now.getFullYear(), mo=now.getMonth(), d=now.getDate();\nlet soPhieu=0, tongKg=0, canKt=0;\nfor(const row of rows){ const t=row['Thời gian xử lý']; if(!t)continue; const dt=new Date(t); if(isNaN(dt))continue;\n  if(dt.getFullYear()===y && dt.getMonth()===mo && dt.getDate()===d){ soPhieu++; const kg=Number(String(row['TL hàng (kg)']||'').replace(/[^0-9.]/g,''))||0; tongKg+=kg; if(String(row['Cần kiểm tra']).toUpperCase()==='CÓ')canKt++; } }\nconst text='📊 BÁO CÁO HÔM NAY ('+d+'/'+(mo+1)+'/'+y+')\\n\\n⚖️ Phiếu cân: '+soPhieu+' phiếu\\n📦 Tổng khối lượng hàng: '+tongKg.toLocaleString('vi-VN')+' kg\\n⚠️ Cần kiểm tra: '+canKt+' phiếu'+(canKt?' (mở Sheet lọc cột \"Cần kiểm tra\"=CÓ)':'');\nreturn { json: { chatId, text } };"
+      },
+      "id": "ee825934-f33a-433c-8220-afe84b336f35",
+      "name": "Đếm hôm nay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Đếm hôm nay').first().json.chatId }}",
+        "text": "={{ $('Đếm hôm nay').first().json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "44bc5f74-a54d-4573-a034-60b55747039e",
+      "name": "Trả lời báo cáo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        840
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CRED",
+          "name": "Bot Thanh Huong"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nhận Telegram": {
+      "main": [
+        [
+          {
+            "node": "Định tuyến",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Định tuyến": {
+      "main": [
+        [
+          {
+            "node": "Chia nhánh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chia nhánh": {
+      "main": [
+        [
+          {
+            "node": "🏠 Gửi menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Xác nhận chế độ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tải ảnh CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tải ảnh cân",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phân tích mua",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tìm người bán",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Đọc phiếu cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh CCCD": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị CCCD": {
+      "main": [
+        [
+          {
+            "node": "Gemini đọc CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini đọc CCCD": {
+      "main": [
+        [
+          {
+            "node": "Tách CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách CCCD": {
+      "main": [
+        [
+          {
+            "node": "Ghi CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi CCCD": {
+      "main": [
+        [
+          {
+            "node": "Trả lời CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh cân": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị cân": {
+      "main": [
+        [
+          {
+            "node": "Gemini đọc cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini đọc cân": {
+      "main": [
+        [
+          {
+            "node": "Tách cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách cân": {
+      "main": [
+        [
+          {
+            "node": "Ghi cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi cân": {
+      "main": [
+        [
+          {
+            "node": "Trả lời cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phân tích mua": {
+      "main": [
+        [
+          {
+            "node": "Đọc danh bạ CCCD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đọc danh bạ CCCD": {
+      "main": [
+        [
+          {
+            "node": "Ghép người bán",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghép người bán": {
+      "main": [
+        [
+          {
+            "node": "Ghi mua lúa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi mua lúa": {
+      "main": [
+        [
+          {
+            "node": "Trả lời mua",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tìm người bán": {
+      "main": [
+        [
+          {
+            "node": "Đọc CCCD (tra)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đọc CCCD (tra)": {
+      "main": [
+        [
+          {
+            "node": "Kết quả tra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kết quả tra": {
+      "main": [
+        [
+          {
+            "node": "Trả lời tra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đọc phiếu cân": {
+      "main": [
+        [
+          {
+            "node": "Đếm hôm nay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Đếm hôm nay": {
+      "main": [
+        [
+          {
+            "node": "Trả lời báo cáo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

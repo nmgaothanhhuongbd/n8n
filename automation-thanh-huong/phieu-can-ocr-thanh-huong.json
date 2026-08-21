@@ -1,0 +1,274 @@
+{
+  "name": "Phiếu cân lúa - OCR Claude → Google Sheet (Thạnh Hương)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1r7ltl3SUJz-JxkUox5Ohd_KH7AAyFWIpocGx5xSJPEombOmF5JfmQTv5H5ypXyMcgSAPabgA",
+          "mode": "id"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "a1111111-1111-4111-8111-111111111111",
+      "name": "Drive: ảnh phiếu mới",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c0000001-0000-0000-0000-000000000001",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "image/",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a2222222-2222-4222-8222-222222222222",
+      "name": "Chỉ xử lý ảnh",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "a3333333-3333-4333-8333-333333333333",
+      "name": "Tải ảnh phiếu",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        180,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Chuyển ảnh sang base64 và dựng body gọi Claude Vision\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst base64 = buffer.toString('base64');\nconst meta = $input.item.binary.data;\nconst mimeType = (meta && meta.mimeType) ? meta.mimeType : 'image/jpeg';\n\nconst trigger = $('Drive: ảnh phiếu mới').item.json;\n\nconst prompt = `Bạn là trợ lý đọc PHIẾU CÂN của nhà máy xay xát gạo Thạnh Hương.\nẢnh là một phiếu cân (có thể là phiếu THU MUA LÚA đầu vào, hoặc phiếu BÁN cám/trấu/gạo đầu ra; có thể của nhà máy hoặc của đối tác như De Heus, CP).\nHãy đọc kỹ và trích xuất thông tin. Chữ IN/số máy in đọc chính xác; với chữ VIẾT TAY hãy cẩn thận và hạ độ tin cậy nếu không chắc.\n\nTRẢ VỀ DUY NHẤT một object JSON (không thêm lời giải thích, không bọc trong markdown) theo đúng cấu trúc:\n{\n  \"ngay\": \"ngày trên phiếu, định dạng DD/MM/YYYY nếu đọc được\",\n  \"so_phieu\": \"số phiếu / số chứng từ\",\n  \"nguoi_ban_khach_hang\": \"tên nhà cung cấp / người bán / khách hàng\",\n  \"loai_hang_lua\": \"loại hàng hoặc loại lúa (vd: lúa tươi, OM5451, cám gạo, trấu...)\",\n  \"so_xe\": \"biển số xe\",\n  \"tl_xe_vao\": \"trọng lượng xe vào / xe có hàng, chỉ lấy số kg\",\n  \"tl_xe_ra\": \"trọng lượng xe ra / xe không, chỉ lấy số kg\",\n  \"tl_hang\": \"trọng lượng hàng (tịnh), chỉ lấy số kg\",\n  \"do_am\": \"độ ẩm % nếu có, ngược lại để rỗng\",\n  \"kieu_can\": \"NHẬP hay XUẤT nếu xác định được\",\n  \"ghi_chu_chat_luong\": \"mọi ghi chú về chất lượng, tạp chất, sâu mọt... nếu có\",\n  \"nguoi_can\": \"tên người cân nếu có\",\n  \"do_tin_cay\": \"một trong: cao | trung bình | thấp — đánh giá tổng thể độ chắc chắn khi đọc, đặc biệt các ô viết tay/mờ\",\n  \"can_kiem_tra\": true hoặc false — đặt true nếu có bất kỳ trường quan trọng nào (số cân, người bán, loại lúa) bạn không chắc,\n  \"ly_do_kiem_tra\": \"giải thích ngắn vì sao cần kiểm tra, để rỗng nếu không cần\"\n}\nNếu một trường không có trên phiếu, để chuỗi rỗng \"\". Các trường trọng lượng chỉ ghi con số (không kèm 'kg', không dấu phẩy ngăn cách nghìn).`;\n\nreturn {\n  json: {\n    fileId: trigger.id,\n    fileName: trigger.name,\n    body: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 1024,\n      messages: [\n        {\n          role: 'user',\n          content: [\n            { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },\n            { type: 'text', text: prompt }\n          ]\n        }\n      ]\n    }\n  }\n};"
+      },
+      "id": "a4444444-4444-4444-8444-444444444444",
+      "name": "Chuẩn bị yêu cầu Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "a5555555-5555-4555-8555-555555555555",
+      "name": "Claude đọc ảnh (Vision)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ANTHROPIC_CRED",
+          "name": "Anthropic x-api-key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Phân tích kết quả Claude trả về + kiểm tra logic số cân\nconst prep = $('Chuẩn bị yêu cầu Claude').item.json;\nconst fileId = prep.fileId;\nconst fileName = prep.fileName;\n\n// Lấy text JSON từ phản hồi Anthropic\nlet text = '';\ntry {\n  text = $json.content[0].text;\n} catch (e) {\n  text = '';\n}\n\nlet clean = (text || '').trim();\nclean = clean.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();\n\nlet data = {};\nlet parseError = '';\ntry {\n  data = JSON.parse(clean);\n} catch (e) {\n  parseError = 'Không đọc được JSON từ AI';\n  data = {};\n}\n\nconst toNum = (s) => {\n  if (s === null || s === undefined || s === '') return null;\n  const n = Number(String(s).replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? null : n;\n};\n\nconst vao = toNum(data.tl_xe_vao);\nconst ra = toNum(data.tl_xe_ra);\nconst hang = toNum(data.tl_hang);\n\n// Kiểm tra logic: |vào - ra| phải xấp xỉ trọng lượng hàng\nlet mathOk = true;\nlet mathNote = '';\nif (vao !== null && ra !== null && hang !== null) {\n  const diff = Math.abs(Math.abs(vao - ra) - hang);\n  const tol = Math.max(20, hang * 0.01); // sai số cho phép 20kg hoặc 1%\n  if (diff > tol) {\n    mathOk = false;\n    mathNote = `Lệch cân: |${vao}-${ra}| = ${Math.abs(vao - ra)} khác TL hàng ${hang}`;\n  }\n}\n\nconst conf = String(data.do_tin_cay || '').toLowerCase();\nconst lowConf = conf.includes('thấp') || conf.includes('thap') || conf === 'low';\nconst aiFlag = data.can_kiem_tra === true || data.can_kiem_tra === 'true';\n\nconst needsReview = !!(parseError || lowConf || !mathOk || aiFlag);\n\nlet reasons = [];\nif (parseError) reasons.push(parseError);\nif (lowConf) reasons.push('AI báo độ tin cậy thấp');\nif (!mathOk) reasons.push(mathNote);\nif (aiFlag && data.ly_do_kiem_tra) reasons.push(data.ly_do_kiem_tra);\nelse if (aiFlag) reasons.push('AI đánh dấu cần kiểm tra');\n\nreturn {\n  json: {\n    'Thời gian xử lý': new Date().toISOString(),\n    'Tên file': fileName || '',\n    'Link ảnh': fileId ? `https://drive.google.com/file/d/${fileId}/view` : '',\n    'Ngày phiếu': data.ngay || '',\n    'Số phiếu': data.so_phieu || '',\n    'Người bán / Khách hàng': data.nguoi_ban_khach_hang || '',\n    'Loại hàng / lúa': data.loai_hang_lua || '',\n    'Số xe': data.so_xe || '',\n    'TL xe vào (kg)': vao !== null ? vao : '',\n    'TL xe ra (kg)': ra !== null ? ra : '',\n    'TL hàng (kg)': hang !== null ? hang : '',\n    'Độ ẩm (%)': data.do_am || '',\n    'Kiểu cân': data.kieu_can || '',\n    'Ghi chú chất lượng': data.ghi_chu_chat_luong || '',\n    'Người cân': data.nguoi_can || '',\n    'Độ tin cậy': data.do_tin_cay || '',\n    'Cần kiểm tra': needsReview ? 'CÓ' : 'Không',\n    'Lý do kiểm tra': reasons.join('; ')\n  }\n};"
+      },
+      "id": "a6666666-6666-4666-8666-666666666666",
+      "name": "Tách trường + kiểm tra số cân",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "PHIEU_CAN",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a7777777-7777-4777-8777-777777777777",
+      "name": "Ghi vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1060,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_GOOGLE_CRED",
+          "name": "Google Drive/Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Drive: ảnh phiếu mới": {
+      "main": [
+        [
+          {
+            "node": "Chỉ xử lý ảnh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chỉ xử lý ảnh": {
+      "main": [
+        [
+          {
+            "node": "Tải ảnh phiếu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tải ảnh phiếu": {
+      "main": [
+        [
+          {
+            "node": "Chuẩn bị yêu cầu Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuẩn bị yêu cầu Claude": {
+      "main": [
+        [
+          {
+            "node": "Claude đọc ảnh (Vision)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude đọc ảnh (Vision)": {
+      "main": [
+        [
+          {
+            "node": "Tách trường + kiểm tra số cân",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tách trường + kiểm tra số cân": {
+      "main": [
+        [
+          {
+            "node": "Ghi vào Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
