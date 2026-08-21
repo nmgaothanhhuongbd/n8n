@@ -164,12 +164,33 @@ const ALLOWED = [
 
 ## ⚠️ Xử lý sự cố
 
+### 🔧 Trước tiên: chạy TỰ KIỂM TRA
+Trong Apps Script, chọn hàm **`kiemTra`** → bấm **▶ Run** → xem khung *Execution log*.
+Nó kiểm tra: token bot, webhook, 3 bảng tính, khoá Gemini, danh sách nhân viên —
+và chỉ rõ chỗ nào hỏng.
+
+### 🔁 Bot nhắn lặp lại nhiều lần
+Gần như luôn là do **webhook trỏ tới bản deploy CŨ** (code mới không chạy).
+1. Chạy **`kiemTra`** → nếu thấy dòng ❌ *"LỆCH! Webhook trỏ bản deploy CŨ"*
+2. Chạy hàm **`xoaTinTonDong`** (xoá hàng tin cũ đang dồn)
+3. Chạy lại hàm **`setWebhook`**
+
+### 📸 Gửi ảnh mà không thấy dữ liệu vào Sheet
+1. **Nhớ bấm nút ✅ Lưu vào sổ** trên thẻ — ảnh KHÔNG tự ghi, phải xác nhận
+2. Nếu bot báo *"Không đọc được thông tin từ ảnh"* → chụp lại gần hơn, đủ sáng, mỗi lần 1 giấy tờ
+3. Nếu bot báo lỗi Gemini → chạy `kiemTra` xem khoá còn dùng được không
+
 | Hiện tượng | Cách xử lý |
 |---|---|
-| Bot không trả lời | Chạy lại hàm **`webhookInfo`** xem báo lỗi gì. Kiểm tra Deploy đã chọn **Anyone** chưa |
-| Báo lỗi quyền Sheet | Chạy thử hàm `handleBaoCao` 1 lần để Google xin quyền Sheet |
-| Đổi khóa Gemini | Sửa `GEMINI_KEY` → Ctrl+S (không cần deploy lại) |
-| Muốn tắt bot tạm | Chạy hàm **`deleteWebhook`** |
+| Bot im lặng hoàn toàn | Chạy `kiemTra`; kiểm tra Deploy đã chọn **Anyone** chưa |
+| Báo lỗi quyền Sheet | Chạy `kiemTra` 1 lần để Google xin quyền Sheet |
+| Đổi khoá Gemini / thêm nhân viên | Sửa → Ctrl+S → **Deploy → Manage deployments → New version** |
+| Muốn tắt bot tạm | Chạy hàm `deleteWebhook` |
+
+> ⛔ **BẪY HAY GẶP NHẤT:** Mỗi lần sửa code phải vào
+> **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**.
+> Nếu bấm **"New deployment"** thì sẽ ra **URL MỚI** và webhook vẫn trỏ URL cũ
+> → code mới không bao giờ chạy. Lỡ làm vậy thì chạy lại **`setWebhook`**.
 
 ---
 

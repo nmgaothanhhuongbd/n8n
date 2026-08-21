@@ -29,15 +29,32 @@ const F_MUA  = [['ten','Người bán'],['loai','Loại lúa'],['kg','Số kg'],
 // ============ WEBHOOK ============
 function doGet(){ return ContentService.createTextOutput('Mini App Thanh Huong dang chay ✅'); }
 function doPost(e){
-  try { route(JSON.parse(e.postData.contents)); } catch(err){ console.error(err); }
-  return ContentService.createTextOutput('ok');
+  let upd=null;
+  try { upd=JSON.parse(e.postData.contents); } catch(x){ return ok(); }
+  try {
+    route(upd);
+  } catch(err){
+    console.error(err);
+    // Báo cho người dùng biết hỏng ở đâu, đừng im lặng
+    const cid = chatIdOf(upd);
+    if (cid) { try{ tgApi('sendMessage',{chat_id:cid,
+      text:'❌ Có lỗi xảy ra:\n'+(err && err.message ? err.message : err)+'\n\nHãy chụp màn hình này gửi quản lý.'}); }catch(x){} }
+  }
+  return ok();
+}
+function ok(){ return ContentService.createTextOutput('ok'); }
+function chatIdOf(upd){
+  if (!upd) return null;
+  if (upd.message && upd.message.chat) return upd.message.chat.id;
+  if (upd.callback_query && upd.callback_query.message) return upd.callback_query.message.chat.id;
+  return null;
 }
 
 // ============ ĐIỀU HƯỚNG ============
 function route(upd){
   // Telegram gửi lại tin khi script xử lý lâu -> phải chặn chạy trùng.
   // Dùng KHOÁ để 2 bản chạy song song không cùng thấy "chưa xử lý".
-  if (upd.update_id && seen('u'+upd.update_id, 900)) return;
+  if (upd.update_id && seen('u'+upd.update_id)) return;
 
   // ---- Bấm nút trong thẻ (inline) ----
   if (upd.callback_query){
@@ -56,7 +73,7 @@ function route(upd){
   // chỉ chống bấm dồn cho NÚT MENU (không chặn câu trả lời của nhân viên,
   // vì họ có thể gõ trùng số như 5200 kg rồi 5200 đ)
   const isNav = /^\/?start\b/i.test(text) || /[🏠🪪⚖️🌾📊🔎]/.test(text);
-  if (isNav && seen('a'+chatId+'|'+text, 4)) return;
+  if (isNav && seen('a'+chatId+'|'+text+'|'+Math.floor(Date.now()/4000))) return;
   const photo=(msg.photo&&msg.photo.length) ? msg.photo[msg.photo.length-1].file_id
             : (msg.document&&(msg.document.mime_type||'').indexOf('image/')===0 ? msg.document.file_id : null);
 
@@ -229,9 +246,15 @@ function readPhoto(chatId, fileId, msgId, kind){
     const vao=num(d.tl_xe_vao), ra=num(d.tl_xe_ra);
     if (num(d.tl_hang)===null && vao!==null && ra!==null) d.tl_hang=Math.abs(vao-ra);
   }
+  if (wait) tgApi('deleteMessage',{chat_id:chatId, message_id:wait});
+  const co = d && (d.so_cccd || d.ho_ten || d.tl_hang || d.tl_xe_vao || d.nguoi_ban_khach_hang);
+  if (!co){
+    send(chatId,'⚠️ Không đọc được thông tin từ ảnh này.\n\nThử lại: chụp gần hơn, đủ sáng, thấy rõ 4 góc và *mỗi lần một giấy tờ*.',
+      kbInline([[btn('🔁 Thử lại','m:'+kind)],[btn('🏠 Trang chính','m:menu')]]),true);
+    return;
+  }
   const st={f:kind, s:'', d:d, msgId:msgId};
   setState(chatId,st);
-  if (wait) tgApi('deleteMessage',{chat_id:chatId, message_id:wait});
   showCard(chatId,st);
 }
 
@@ -351,16 +374,22 @@ function doBaoCao(chatId, kind, mid){
 }
 
 // ============ TIỆN ÍCH ============
-// Đánh dấu "đã xử lý". Dùng khoá để 2 bản chạy song song không lọt cả hai.
-function seen(key, ttl){
-  const c=CacheService.getScriptCache(), lock=LockService.getScriptLock();
-  try { lock.waitLock(20000); } catch(e) { return false; }   // không lấy được khoá thì cứ chạy
+// Đánh dấu "đã xử lý" bằng bộ nhớ BỀN (Properties) + khoá.
+// Bộ nhớ tạm (Cache) không đáng tin khi 2 bản chạy song song.
+function seen(key){
+  const lock=LockService.getScriptLock();
+  try { lock.waitLock(25000); } catch(e){ return false; }
   try {
-    if (c.get(key)) return true;
-    c.put(key, '1', ttl);
+    const pr=P(); let ids=[];
+    try { ids=JSON.parse(pr.getProperty('seen_ids')||'[]'); } catch(e){ ids=[]; }
+    if (ids.indexOf(key)>=0) return true;         // đã xử lý rồi
+    ids.push(key);
+    if (ids.length>400) ids=ids.slice(-300);      // giữ gọn
+    pr.setProperty('seen_ids', JSON.stringify(ids));
     return false;
   } finally { try{ lock.releaseLock(); }catch(e){} }
 }
+
 function allowed(uid){ return ALLOWED.indexOf(Number(uid))>=0; }
 function denyText(uid){ return '⛔ Bạn chưa được cấp quyền dùng ứng dụng này.\n\nMã của bạn: '+uid+'\nGửi mã này cho quản lý để được mở khoá.'; }
 function P(){ return PropertiesService.getScriptProperties(); }
@@ -425,7 +454,71 @@ function gemini(prompt,b64,mime){
               generationConfig:{temperature:0,response_mime_type:'application/json'}};
   const r=UrlFetchApp.fetch(GEMINI_URL+'?key='+encodeURIComponent(GEMINI_KEY),
     {method:'post',contentType:'application/json',payload:JSON.stringify(body),muteHttpExceptions:true});
-  try{ return JSON.parse(r.getContentText()).candidates[0].content.parts[0].text; }catch(e){ return ''; }
+  const code=r.getResponseCode(), resp=r.getContentText();
+  if (code!==200){
+    let m=''; try{ m=JSON.parse(resp).error.message; }catch(x){ m=resp.substring(0,200); }
+    throw new Error('Gemini báo lỗi ('+code+'): '+m);
+  }
+  try{ return JSON.parse(resp).candidates[0].content.parts[0].text; }
+  catch(e){ throw new Error('Gemini không trả về nội dung. Ảnh có thể bị chặn hoặc quá mờ.'); }
+}
+
+
+// ============ TỰ KIỂM TRA (chọn hàm kiemTra rồi bấm ▶ Run) ============
+function kiemTra(){
+  const L=[]; const add=(ok,t)=>L.push((ok?'✅ ':'❌ ')+t);
+
+  // 1) Token bot
+  let me=null;
+  try{
+    const r=tgApi('getMe',{}); me=JSON.parse(r.getContentText());
+    add(me.ok, 'Token bot: '+(me.ok ? 'OK (@'+me.result.username+')' : r.getContentText()));
+  }catch(e){ add(false,'Token bot lỗi: '+e.message); }
+
+  // 2) Webhook có trỏ đúng bản deploy hiện tại không  <-- hay bị sai nhất
+  try{
+    const info=JSON.parse(tgApi('getWebhookInfo',{}).getContentText()).result||{};
+    const cur=ScriptApp.getService().getUrl();
+    add(!!info.url, 'Webhook đang trỏ tới: '+(info.url||'(chưa cài)'));
+    L.push('   URL bản deploy hiện tại: '+cur);
+    if (info.url && cur && info.url.indexOf(cur.replace(/\/exec$/,''))<0)
+      add(false,'LỆCH! Webhook trỏ bản deploy CŨ -> code mới không chạy. Hãy chạy lại setWebhook.');
+    else if (info.url) add(true,'Webhook khớp bản deploy hiện tại');
+    if (info.pending_update_count) L.push('   ⏳ Đang tồn đọng '+info.pending_update_count+' tin chưa xử lý');
+    if (info.last_error_message) L.push('   ⚠️ Lỗi gần nhất Telegram gặp: '+info.last_error_message);
+  }catch(e){ add(false,'Không đọc được webhook: '+e.message); }
+
+  // 3) Ba bảng tính
+  [[SHEET_CCCD,TAB_CCCD,'CCCD_DATA'],[SHEET_CAN,TAB_CAN,'PHIEU_CAN'],[SHEET_MUA,TAB_MUA,'MUA_LUA']]
+  .forEach(function(x){
+    try{
+      const sheet=sh(x[0],x[1]);
+      add(true, x[2]+': đọc được ('+Math.max(0,sheet.getLastRow()-1)+' dòng, tab "'+sheet.getName()+'")');
+    }catch(e){ add(false, x[2]+' lỗi: '+e.message); }
+  });
+
+  // 4) Gemini
+  try{
+    const r=UrlFetchApp.fetch(GEMINI_URL+'?key='+encodeURIComponent(GEMINI_KEY),
+      {method:'post',contentType:'application/json',muteHttpExceptions:true,
+       payload:JSON.stringify({contents:[{parts:[{text:'Trả về đúng chữ: OK'}]}]})});
+    if (r.getResponseCode()===200) add(true,'Khoá Gemini: OK');
+    else { let m=''; try{ m=JSON.parse(r.getContentText()).error.message; }catch(x){ m=r.getContentText().substring(0,150); }
+      add(false,'Khoá Gemini lỗi ('+r.getResponseCode()+'): '+m); }
+  }catch(e){ add(false,'Gemini lỗi: '+e.message); }
+
+  // 5) Danh sách nhân viên
+  add(ALLOWED.length>0, 'Số người được phép dùng: '+ALLOWED.length);
+
+  const out='===== KẾT QUẢ KIỂM TRA =====\n'+L.join('\n');
+  Logger.log(out);
+  return out;
+}
+
+// Xoá hàng đợi tin cũ đang tồn đọng (khi bot nhắn lặp không dứt)
+function xoaTinTonDong(){
+  Logger.log(tgApi('deleteWebhook',{drop_pending_updates:true}).getContentText());
+  Logger.log('Đã xoá tin tồn đọng. Bây giờ chạy lại setWebhook.');
 }
 
 // ============ CÀI WEBHOOK (chạy 1 lần sau khi Deploy) ============
